@@ -1,0 +1,35 @@
+{
+  "name": "Corporación Cultural de Iquique",
+  "url": "https://culturaiquique.cl/",
+  "connector": "html_cards",
+  "region": "Región de Tarapacá",
+  "commune": "Iquique",
+  "city": "Iquique",
+  "organizer": "Corporación Cultural de Iquique",
+  "default_categories": [
+    "Cultura"
+  ],
+  "card_selector": "article.cmsmasters_slider_post",
+  "date_range_parser": "spanish_same_month",
+  "title_remove_pattern": "^\\d{1,2}(?:\\s+y\\s+\\d{1,2})?\\s+de\\s+[A-Za-zÁÉÍÓÚáéíóúÑñ]+\\s*:\\s*",
+  "selectors": {
+    "title": "h4.cmsmasters_slider_post_title a",
+    "date_range": "h4.cmsmasters_slider_post_title a",
+    "category": ".cmsmasters_slider_post_category a",
+    "description": ".cmsmasters_slider_post_content",
+    "image_url": {
+      "selector": "img",
+      "attribute": "src"
+    },
+    "source_url": {
+      "selector": "h4.cmsmasters_slider_post_title a",
+      "attribute": "href"
+    }
+  },
+  "validate_event_urls": true,
+  "max_results": 0,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_note": "Fuente institucional de Tarapacá. Lee las publicaciones destacadas de programación y conserva únicamente actividades vigentes."
+}

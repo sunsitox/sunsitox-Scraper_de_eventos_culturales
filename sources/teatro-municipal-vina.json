@@ -1,0 +1,20 @@
+{
+  "name": "Teatro Municipal de Viña del Mar",
+  "url": "https://teatrovina.cl/cartelera/",
+  "connector": "generic",
+  "region": "Región de Valparaíso",
+  "commune": "Viña del Mar",
+  "city": "Viña del Mar",
+  "organizer": "Teatro Municipal de Viña del Mar",
+  "location_defaults": {
+    "venue": "Teatro Municipal de Viña del Mar"
+  },
+  "default_categories": [
+    "Artes escénicas"
+  ],
+  "max_pages": 60,
+  "max_results": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true
+}

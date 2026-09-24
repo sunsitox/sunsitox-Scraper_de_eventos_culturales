@@ -1,0 +1,54 @@
+{
+  "name": "Enoturismo Chile · Agenda",
+  "url": "https://www.enoturismochile.cl/agenda/",
+  "api_url": "https://www.enoturismochile.cl/wp-json/wp/v2/ajde_events",
+  "wp_api_base": "https://www.enoturismochile.cl/wp-json/wp/v2",
+  "connector": "eventon_wordpress",
+  "organizer": "Enoturismo Chile",
+  "default_categories": [
+    "Vino",
+    "Enoturismo"
+  ],
+  "category_field": "event_type",
+  "category_taxonomy": "event_type",
+  "area_field": "event_type_2",
+  "area_taxonomy": "event_type_2",
+  "region_by_area": {
+    "valle-de-casablanca": "Región de Valparaíso",
+    "valle-de-san-antonio-leyda": "Región de Valparaíso",
+    "valle-del-aconcagua": "Región de Valparaíso",
+    "valle-del-maipo": "Región Metropolitana de Santiago",
+    "valle-del-cachapoal": "Región del Libertador Bernardo O'Higgins",
+    "valle-de-colchagua": "Región del Libertador Bernardo O'Higgins",
+    "valle-de-curico": "Región del Maule",
+    "valle-del-maule": "Región del Maule"
+  },
+  "commune_by_location": {
+    "Barrio Italia, Providencia": "Providencia",
+    "Pirque": "Pirque",
+    "Plaza Ñuñoa": "Ñuñoa",
+    "Estadio Nacional": "Ñuñoa",
+    "San Fernando": "San Fernando",
+    "Santa Cruz": "Santa Cruz",
+    "Marchigüe": "Marchigüe",
+    "Casablanca": "Casablanca",
+    "San Antonio": "San Antonio",
+    "Curicó": "Curicó",
+    "Talca": "Talca"
+  },
+  "region_by_commune": {
+    "Providencia": "Región Metropolitana de Santiago",
+    "Pirque": "Región Metropolitana de Santiago",
+    "Ñuñoa": "Región Metropolitana de Santiago",
+    "San Fernando": "Región del Libertador Bernardo O'Higgins",
+    "Santa Cruz": "Región del Libertador Bernardo O'Higgins",
+    "Marchigüe": "Región del Libertador Bernardo O'Higgins",
+    "Casablanca": "Región de Valparaíso",
+    "San Antonio": "Región de Valparaíso",
+    "Curicó": "Región del Maule",
+    "Talca": "Región del Maule"
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

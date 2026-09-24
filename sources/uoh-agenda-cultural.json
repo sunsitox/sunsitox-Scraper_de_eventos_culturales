@@ -1,0 +1,26 @@
+{
+  "name": "Agenda Cultural UOH",
+  "url": "https://www.uoh.cl/extension/agenda/",
+  "api_url": "https://www.uoh.cl/wp-json/wp/v2/events",
+  "connector": "wordpress_rest",
+  "region": "Región del Libertador Bernardo O'Higgins",
+  "commune": "Rancagua",
+  "city": "Rancagua",
+  "organizer": "Universidad de O'Higgins",
+  "field_map": {
+    "title": "title.rendered",
+    "start_date": "f_h_inicio",
+    "end_date": "f_h_termino",
+    "venue": "_embedded.wp:term.1.0.name",
+    "categories": "_embedded.wp:term.0.0.name",
+    "description": "yoast_head_json.description",
+    "image_url": "_embedded.wp:featuredmedia.0.source_url",
+    "source_url": "link",
+    "official_url": "link"
+  },
+  "max_results": 0,
+  "description_max_chars": 2000,
+  "validate_event_urls": true,
+  "official": true,
+  "enabled": true
+}

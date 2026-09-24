@@ -1,0 +1,49 @@
+{
+  "name": "Centro Cultural CEINA",
+  "url": "https://ceina.cl/cartelera/",
+  "connector": "html_cards",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Santiago",
+  "city": "Santiago",
+  "organizer": "Fundación CEINA",
+  "venue": "Centro Cultural CEINA",
+  "address": "Arturo Prat 33, Santiago",
+  "default_categories": [
+    "Cultura"
+  ],
+  "card_selector": "article.bde-loop-item.ee-post",
+  "date_range_parser": "spanish_flexible",
+  "category_rules": {
+    "música|concierto|orquesta|canto": ["Música"],
+    "teatro|teatral": ["Teatro", "Artes escénicas"],
+    "danza|performance": ["Danza", "Artes escénicas"],
+    "taller|seminario|formación": ["Taller"],
+    "cine|audiovisual": ["Cine"],
+    "exposición|artes visuales": ["Exposición", "Artes visuales"]
+  },
+  "selectors": {
+    "title": "h5.bde-heading",
+    "date_range": "h5.bde-heading ~ div.bde-text",
+    "category": "a[rel='tag']",
+    "description": ".bde-text-156-135",
+    "image_url": {
+      "selector": "img",
+      "attribute": "src"
+    },
+    "source_url": {
+      "selector": "a[href^='https://ceina.cl/cartelera/']",
+      "attribute": "href"
+    }
+  },
+  "request_headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml"
+  },
+  "require_start_date": true,
+  "validate_event_urls": true,
+  "max_results": 0,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_note": "Cartelera oficial con eventos vigentes, fechas, categorías, imágenes y fichas individuales. Puntaje técnico 100 en el inventario auditado."
+}

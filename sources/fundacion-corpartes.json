@@ -1,0 +1,22 @@
+{
+  "name": "Fundación CorpArtes",
+  "url": "https://corpartes.cl/programacion/",
+  "connector": "html_cards",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Las Condes",
+  "city": "Santiago",
+  "organizer": "Fundación CorpArtes",
+  "venue": "Centro Cultural CA660",
+  "address": "Rosario Norte 660, nivel -2, Las Condes",
+  "default_categories": ["Cultura", "Artes escénicas"],
+  "card_selector": "article.card-evento-pro",
+  "selectors": {
+    "title": ".titulo-evento-pro",
+    "date_range": ".fecha-evento-pro",
+    "categories": ".tag-categoria-pro",
+    "source_url": {"selector": "a.btn-ticketera-pro", "attribute": "href"}
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

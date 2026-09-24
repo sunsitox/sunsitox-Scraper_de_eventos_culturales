@@ -1,0 +1,13 @@
+{
+  "name": "Valpo Cultura",
+  "url": "https://valpocultura.cl/agenda-cultural/",
+  "api_url": "https://valpocultura.cl/wp-json/tribe/events/v1/events",
+  "connector": "tribe_events_api",
+  "region": "Región de Valparaíso",
+  "commune": "Valparaíso",
+  "city": "Valparaíso",
+  "organizer": "Dirección de Desarrollo Cultural · Municipalidad de Valparaíso",
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

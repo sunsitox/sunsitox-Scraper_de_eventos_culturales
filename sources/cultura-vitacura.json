@@ -1,0 +1,22 @@
+{
+  "name": "Cultura Vitacura",
+  "url": "https://vitacuracultura.cl/actividades/",
+  "connector": "html_cards",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Vitacura",
+  "city": "Santiago",
+  "organizer": "Corporación Cultural de Vitacura",
+  "venue": "Corporación Cultural de Vitacura",
+  "address": "Avenida Vitacura 8620, Vitacura",
+  "default_categories": ["Cultura"],
+  "card_selector": "div.eventos-list div.evento",
+  "selectors": {
+    "title": ".info-evento h2",
+    "categories": ".tipos-evento",
+    "description": ".info-evento p",
+    "source_url": {"selector": "a.cover", "attribute": "href"}
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

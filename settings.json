@@ -1,0 +1,23 @@
+{
+  "target_regions": [
+    "Región Metropolitana de Santiago",
+    "Región de Antofagasta",
+    "Región de Arica-Parinacota",
+    "Región de Atacama",
+    "Región de Aysén del General Carlos Ibáñez del Campo",
+    "Región de Coquimbo",
+    "Región de Los Ríos",
+    "Región de Magallanes y la Antártica Chilena",
+    "Región de Tarapacá",
+    "Región de Valparaíso",
+    "Región de la Araucanía",
+    "Región de los Lagos",
+    "Región de Ñuble",
+    "Región del Biobío",
+    "Región del Libertador Bernardo O'Higgins",
+    "Región del Maule"
+  ],
+  "include_unknown_region": false,
+  "cultural_filter_enabled": true,
+  "cultural_review_action": "keep"
+}

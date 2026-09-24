@@ -1,0 +1,21 @@
+{
+  "name": "Santiago Cultura",
+  "url": "https://www.santiagocultura.cl/agenda-cultural/",
+  "api_url": "https://www.santiagocultura.cl/wp-json/wp/v2/ajde_events",
+  "connector": "santiago_wordpress",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Santiago",
+  "city": "Santiago",
+  "organizer": "Subdirección de Cultura · Municipalidad de Santiago",
+  "default_categories": [
+    "Cultura"
+  ],
+  "max_results": 0,
+  "official": true,
+  "enabled": true,
+  "incremental": true,
+  "full_audit_days": 7,
+  "detail_refresh_hours": 24,
+  "integration_status": "active",
+  "integration_note": "Revisa el índice WordPress completo, reutiliza fichas según modified_gmt y revalida cada ficha al cumplir siete días. La primera extracción completa puede ser lenta."
+}

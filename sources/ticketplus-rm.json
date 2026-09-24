@@ -1,0 +1,18 @@
+{
+  "name": "Ticketplus · Chile",
+  "url": "https://ticketplus.cl/states/region-metropolitana",
+  "connector": "ticketplus_chile",
+  "region": "Chile",
+  "official": false,
+  "link_path_prefixes": [
+    "/events/"
+  ],
+  "max_pages": 0,
+  "incremental": true,
+  "detail_refresh_hours": 24,
+  "max_results": 0,
+  "use_nvidia": false,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_note": "Descubre las carteleras regionales desde el selector público de Ticketplus y las recorre de forma secuencial. Reutiliza cada ficha durante un máximo de 24 horas; una ejecución interrumpida conserva el avance por ficha para continuar después."
+}

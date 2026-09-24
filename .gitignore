@@ -1,0 +1,58 @@
+# Entornos virtuales de Python
+venv/
+.venv/
+env/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+!.env.example
+
+# Caché y archivos compilados de Python
+__pycache__/
+.cache/
+state/
+state-export/
+# Estado local del pipeline (checkpoints, cola OCR y respaldos SQLite).
+# La definición del esquema de Supabase sí vive versionada en supabase/migrations/.
+*.sqlite
+*.sqlite3
+*.db
+*.py[cod]
+*$py.class
+
+# Herramientas de pruebas, cobertura y análisis
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+test-results/
+playwright-report/
+
+# Navegadores descargados por Playwright
+.playwright-browsers/
+.supabase/
+supabase/.temp/
+supabase/.branches/
+node_modules/
+
+# Datos generados por los pipelines. El inventario canónico sí se versiona.
+data/*
+!data/source_candidates.json
+
+# Logs y archivos temporales
+*.log
+work/validation-checkpoints-*/
+*.tmp
+*.bak
+*.swp
+~$*
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

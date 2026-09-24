@@ -1,0 +1,165 @@
+name: Extraer eventos y sincronizar Supabase
+
+on:
+  workflow_dispatch:
+  # La periodicidad se agregará cuando esté definida:
+  # schedule:
+  #   - cron: "..."
+  #     timezone: "America/Santiago"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: eventos-culturales-supabase
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      PYTHONUNBUFFERED: "1"
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
+      SUPABASE_ENABLED: "true"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NVIDIA_MODEL: meta/llama-3.2-11b-vision-instruct
+      NVIDIA_RPM_LIMIT: "40"
+      NVIDIA_TIMEOUT_THRESHOLD: "3"
+      NVIDIA_TIMEOUT_COOLDOWN_SECONDS: "60"
+      CHECKPOINT_MAX_AGE_HOURS: "24"
+      OCR_CACHE_DAYS: "30"
+      NVIDIA_MAX_RETRIES: "8"
+      NVIDIA_RETRY_MAX_WAIT_SECONDS: "120"
+      NVIDIA_RETRY_MAX_ELAPSED_SECONDS: "900"
+      NVIDIA_LOCATION_ENRICHMENT: "true"
+      NVIDIA_LOCATION_TIMEOUT_SECONDS: "60"
+      NVIDIA_LOCATION_MAX_RETRIES: "3"
+      NVIDIA_LOCATION_RETRY_MAX_WAIT_SECONDS: "30"
+      NVIDIA_LOCATION_RETRY_MAX_ELAPSED_SECONDS: "240"
+      NVIDIA_CONTENT_ENRICHMENT: "true"
+      NVIDIA_REWRITE_ENABLED: "true"
+      NVIDIA_REWRITE_BATCH_SIZE: "10"
+      NVIDIA_REWRITE_TIMEOUT_SECONDS: "90"
+      NVIDIA_REWRITE_MAX_RETRIES: "3"
+      NVIDIA_REWRITE_RETRY_MAX_WAIT_SECONDS: "60"
+      NVIDIA_REWRITE_RETRY_MAX_ELAPSED_SECONDS: "360"
+      NVIDIA_OCR_ENABLED: "true"
+      NVIDIA_OCR_MODEL: meta/llama-3.2-11b-vision-instruct
+      NVIDIA_OCR_MAX_IMAGES: "100"
+      NVIDIA_OCR_TIMEOUT_SECONDS: "45"
+      NVIDIA_OCR_MAX_RETRIES: "1"
+      NVIDIA_OCR_RETRY_MAX_WAIT_SECONDS: "15"
+      NVIDIA_OCR_RETRY_MAX_ELAPSED_SECONDS: "100"
+      SOURCE_WORKERS: "4"
+      HTTP_CACHE_ENABLED: "true"
+      EVENT_DESCRIPTION_MAX_CHARS: "8000"
+      SUPABASE_DELETE_EXPIRED: "true"
+      SUPABASE_RECONCILE_STALE: "true"
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Buscar checkpoint de esta rama y workflow
+        id: checkpoint
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo = context.repo;
+            const branch = context.ref.replace('refs/heads/', '');
+            const runs = await github.rest.actions.listWorkflowRuns({
+              ...repo, workflow_id: 'scrape-events.yml', branch, per_page: 100
+            });
+            for (const run of runs.data.workflow_runs) {
+              if (!['workflow_dispatch', 'schedule'].includes(run.event)) continue;
+              const response = await github.rest.actions.listWorkflowRunArtifacts({
+                ...repo, run_id: run.id, per_page: 100
+              });
+              const artifacts = response.data.artifacts
+                .filter(a => !a.expired && a.name.startsWith('pipeline-state-'))
+                .sort((a, b) => b.id - a.id);
+              if (artifacts.length) {
+                core.setOutput('artifact', String(artifacts[0].id));
+                core.setOutput('run', String(run.id));
+                break;
+              }
+            }
+
+      - name: Restaurar estado persistente
+        if: steps.checkpoint.outputs.artifact != ''
+        uses: actions/download-artifact@v5
+        with:
+          artifact-ids: ${{ steps.checkpoint.outputs.artifact }}
+          run-id: ${{ steps.checkpoint.outputs.run }}
+          github-token: ${{ github.token }}
+          path: state
+          merge-multiple: true
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Restaurar caché HTTP condicional
+        uses: actions/cache@v4
+        with:
+          path: .cache/http
+          key: eventos-http-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            eventos-http-${{ runner.os }}-
+
+      - name: Verificar secretos obligatorios
+        shell: bash
+        run: |
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_SECRET_KEY" ]]; then
+            echo "Faltan los secretos SUPABASE_URL o SUPABASE_SECRET_KEY."
+            exit 1
+          fi
+
+      - name: Ejecutar pruebas
+        run: python -m unittest discover -s tests -v
+
+      - name: Extraer y guardar checkpoints
+        timeout-minutes: 240
+        run: xvfb-run -a python scrape_events.py --phase extract --local-only
+
+      - name: Preparar copia consistente de la extracción
+        if: always()
+        run: python tools/checkpoint_state.py
+
+      - name: Conservar extracción aunque una fase falle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-state-${{ github.run_id }}-${{ github.run_attempt }}-extract
+          path: state-export/pipeline.sqlite3
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Enriquecer pendientes y sincronizar
+        timeout-minutes: 80
+        run: python scrape_events.py --phase process --supabase
+
+      - name: Preparar copia consistente de la cola
+        if: always()
+        run: python tools/checkpoint_state.py
+
+      - name: Conservar cola y checkpoints al finalizar
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-state-${{ github.run_id }}-${{ github.run_attempt }}-final
+          path: state-export/pipeline.sqlite3
+          retention-days: 30
+          if-no-files-found: ignore

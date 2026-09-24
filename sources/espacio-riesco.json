@@ -1,0 +1,40 @@
+{
+  "name": "Espacio Riesco · Calendario",
+  "url": "https://www.espacioriesco.cl/calendario/",
+  "connector": "html_cards",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Huechuraba",
+  "city": "Santiago",
+  "organizer": "Espacio Riesco",
+  "venue": "Espacio Riesco",
+  "address": "Avenida El Salto 5000, Huechuraba",
+  "default_categories": [
+    "Evento"
+  ],
+  "category_rules": {
+    "expo|exhibición": [
+      "Exposición",
+      "Feria"
+    ],
+    "digital|tecnología": [
+      "Tecnología",
+      "Negocios"
+    ],
+    "fest": [
+      "Festival"
+    ],
+    "show|congreso|convención": [
+      "Feria",
+      "Negocios"
+    ]
+  },
+  "card_selector": "article.article-featured",
+  "date_range_separator": " - ",
+  "selectors": {
+    "title": ".article-title",
+    "date_range": ".article-date"
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

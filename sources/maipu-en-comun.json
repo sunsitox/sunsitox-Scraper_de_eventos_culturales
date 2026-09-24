@@ -1,0 +1,15 @@
+{
+  "name": "Maipú en Común",
+  "url": "https://www.maipuencomun.cl/",
+  "connector": "maipu_browser",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Maipú",
+  "city": "Santiago",
+  "organizer": "Municipalidad de Maipú",
+  "category_filter": "",
+  "max_pages": 0,
+  "browser_request_interval": 1.2,
+  "headless": false,
+  "official": true,
+  "enabled": true
+}

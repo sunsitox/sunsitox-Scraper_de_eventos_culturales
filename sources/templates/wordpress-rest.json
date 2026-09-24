@@ -1,0 +1,23 @@
+{
+  "name": "Nueva agenda WordPress",
+  "url": "https://ejemplo.cl/agenda/",
+  "api_url": "https://ejemplo.cl/wp-json/wp/v2/events",
+  "connector": "wordpress_rest",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "",
+  "organizer": "",
+  "field_map": {
+    "title": "title.rendered",
+    "start_date": "start_date",
+    "end_date": "end_date",
+    "description": "excerpt.rendered",
+    "image_url": "_embedded.wp:featuredmedia.0.source_url",
+    "source_url": "link",
+    "official_url": "link"
+  },
+  "default_categories": ["Cultura"],
+  "validate_event_urls": false,
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

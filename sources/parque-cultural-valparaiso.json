@@ -1,0 +1,25 @@
+{
+  "name": "Parque Cultural de Valparaíso",
+  "url": "https://parquecultural.cl/agenda-de-actividades/",
+  "api_url": "https://parquecultural.cl/wp-json/wp/v2/events_list",
+  "connector": "wordpress_rest",
+  "region": "Región de Valparaíso",
+  "commune": "Valparaíso",
+  "city": "Valparaíso",
+  "organizer": "Parque Cultural de Valparaíso",
+  "venue": "Parque Cultural de Valparaíso",
+  "address": "Cárcel 471, Cerro Cárcel, Valparaíso",
+  "default_categories": ["Cultura", "Artes"],
+  "field_map": {
+    "title": "title.rendered",
+    "start_date": ["acf.fecha_de_inicio", "meta.fecha_de_inicio"],
+    "end_date": ["acf.fecha_de_termino", "meta.fecha_de_termino"],
+    "description": ["acf.extracto_corto", "meta.extracto_corto"],
+    "image_url": ["meta.imagen_evento", "yoast_head_json.og_image.0.url"],
+    "source_url": ["acf.link_al_evento", "link"],
+    "official_url": ["acf.link_al_evento", "link"]
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

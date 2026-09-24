@@ -1,0 +1,19 @@
+{
+  "name": "Nueva cartelera HTML",
+  "url": "https://ejemplo.cl/agenda/",
+  "connector": "html_cards",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "",
+  "organizer": "",
+  "card_selector": "article.evento",
+  "selectors": {
+    "title": "h2",
+    "start_date": ".fecha",
+    "description": ".descripcion",
+    "source_url": {"selector": "a", "attribute": "href"}
+  },
+  "default_categories": ["Cultura"],
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

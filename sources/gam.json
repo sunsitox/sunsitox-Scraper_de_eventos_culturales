@@ -1,0 +1,17 @@
+{
+  "name": "Centro Cultural GAM",
+  "url": "https://gam.cl/es/calendario/",
+  "connector": "generic",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Santiago",
+  "city": "Santiago",
+  "organizer": "Centro Cultural Gabriela Mistral",
+  "default_categories": [
+    "Cultura"
+  ],
+  "max_pages": 80,
+  "max_results": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true
+}

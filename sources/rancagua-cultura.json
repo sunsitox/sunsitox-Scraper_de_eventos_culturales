@@ -1,0 +1,17 @@
+{
+  "name": "Rancagua Cultura",
+  "url": "https://rancaguacultura.cl/event-directory/",
+  "connector": "generic",
+  "region": "Región del Libertador Bernardo O'Higgins",
+  "commune": "Rancagua",
+  "city": "Rancagua",
+  "organizer": "Corporación de la Cultura y las Artes de Rancagua",
+  "default_categories": [
+    "Cultura"
+  ],
+  "max_pages": 60,
+  "max_results": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true
+}

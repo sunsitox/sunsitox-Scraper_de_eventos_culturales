@@ -1,0 +1,24 @@
+{
+  "name": "Nombre de la nueva fuente",
+  "url": "https://ejemplo.cl/agenda/",
+  "connector": "generic",
+  "region": "Región de Valparaíso",
+  "commune": "",
+  "organizer": "",
+  "location_defaults": {
+    "venue": "",
+    "address": "",
+    "postal_code": "",
+    "latitude": "",
+    "longitude": ""
+  },
+  "location_metadata": {},
+  "default_categories": [
+    "Cultura"
+  ],
+  "official": true,
+  "max_pages": 30,
+  "max_results": 0,
+  "description_max_chars": 8000,
+  "enabled": true
+}

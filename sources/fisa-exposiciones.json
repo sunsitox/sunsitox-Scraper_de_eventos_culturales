@@ -1,0 +1,14 @@
+{
+  "name": "FISA · Ferias y Exposiciones",
+  "url": "https://www.fisa.cl/nuestras-ferias/",
+  "connector": "fisa_portfolio",
+  "organizer": "FISA · GL events Chile",
+  "default_categories": [
+    "Exposición",
+    "Feria",
+    "Negocios"
+  ],
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

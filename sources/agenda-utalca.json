@@ -1,0 +1,31 @@
+{
+  "name": "Agenda Universidad de Talca",
+  "url": "https://agenda.utalca.cl/",
+  "connector": "html_cards",
+  "region": "Región del Maule",
+  "commune": "Talca",
+  "city": "Talca",
+  "organizer": "Universidad de Talca",
+  "default_categories": [
+    "Cultura"
+  ],
+  "card_selector": ".o_card",
+  "date_range_separator": " - ",
+  "selectors": {
+    "title": ".o_card__footer .main strong",
+    "date_range": ".o_card__footer .other_data:not(.other_data--place)",
+    "venue": ".o_card__footer .other_data--place",
+    "description": ".o_card__footer .main a",
+    "image_url": {
+      "selector": ".o_card__head img",
+      "attribute": "src"
+    },
+    "source_url": {
+      "selector": ".o_card__footer .main a",
+      "attribute": "href"
+    }
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Chile Cultura",
+  "url": "https://chilecultura.gob.cl/",
+  "api_url": "https://chilecultura.gob.cl/api/v1.0/eventos/search",
+  "connector": "chilecultura_api",
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

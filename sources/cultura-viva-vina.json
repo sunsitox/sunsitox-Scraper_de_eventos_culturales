@@ -1,0 +1,13 @@
+{
+  "name": "Espacio Cultural Viña del Mar",
+  "url": "https://www.culturaviva.cl/actividades/",
+  "api_url": "https://www.culturaviva.cl/wp-json/tribe/events/v1/events",
+  "connector": "tribe_events_api",
+  "region": "Región de Valparaíso",
+  "commune": "Viña del Mar",
+  "city": "Viña del Mar",
+  "organizer": "Corporación Cultural de Viña del Mar",
+  "max_results": 0,
+  "official": true,
+  "enabled": true
+}

@@ -1,0 +1,47 @@
+name: Validar inventario de fuentes culturales
+
+on:
+  workflow_dispatch:
+  # Puede habilitarse una periodicidad cuando se defina:
+  # schedule:
+  #   - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validar-fuentes-culturales
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt
+
+      - name: Ejecutar pruebas
+        run: python -m unittest discover -s tests -v
+
+      - name: Revisar todas las fuentes
+        run: python validate_sources.py --workers 6 --timeout 25 --domain-delay 1.25
+
+      - name: Guardar informe de auditoría
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-fuentes-culturales
+          path: data/source_validation/
+          if-no-files-found: error

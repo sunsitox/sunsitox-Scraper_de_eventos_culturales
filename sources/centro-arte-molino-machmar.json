@@ -1,0 +1,46 @@
+{
+  "name": "Centro de Arte Molino Machmar",
+  "url": "https://www.molinomachmar.cl/cartelera/",
+  "connector": "html_cards",
+  "region": "Región de Los Lagos",
+  "commune": "Puerto Varas",
+  "city": "Puerto Varas",
+  "organizer": "Corporación Centro de Arte Molino Machmar",
+  "venue": "Centro de Arte Molino Machmar",
+  "address": "Avenida Gramado 1100, Puerto Varas",
+  "default_categories": [
+    "Cultura"
+  ],
+  "card_selector": "article.cartelera-card",
+  "date_range_parser": "spanish_abbreviated",
+  "category_rules": {
+    "exposici[oó]n|artes visuales": ["Exposición", "Artes visuales"],
+    "m[uú]sica|concierto": ["Música"],
+    "literatura|poes[ií]a|libro": ["Literatura"],
+    "teatro|artes esc[eé]nicas": ["Teatro", "Artes escénicas"],
+    "danza": ["Danza"],
+    "patrimonio": ["Patrimonio"],
+    "taller|formaci[oó]n": ["Taller"]
+  },
+  "selectors": {
+    "title": ".cartelera-card__title",
+    "date_range": ".cartelera-card__date",
+    "category": ".cartelera-card__category",
+    "venue": ".cartelera-card__summary p:last-child",
+    "description": ".cartelera-card__summary",
+    "price": ".cartelera-card__cta",
+    "image_url": {
+      "selector": ".cartelera-card__image img",
+      "attribute": "src"
+    },
+    "source_url": {
+      "selector": "a.cartelera-card__link",
+      "attribute": "href"
+    }
+  },
+  "max_results": 0,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_note": "Cartelera institucional de Puerto Varas con actividades vigentes, fechas estructuradas y fichas oficiales."
+}

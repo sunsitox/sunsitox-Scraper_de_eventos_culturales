@@ -21,7 +21,6 @@ jobs:
     timeout-minutes: 350
     env:
       PYTHONUNBUFFERED: "1"
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
       SUPABASE_ENABLED: "true"
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -63,6 +62,12 @@ jobs:
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v6
+
+      # El contexto `runner` no existe al evaluar el bloque `jobs.<id>.env`.
+      # Se expone la ruta en tiempo de ejecución para Playwright y todos los pasos posteriores.
+      - name: Configurar caché de navegadores Playwright
+        shell: bash
+        run: echo "PLAYWRIGHT_BROWSERS_PATH=${RUNNER_TEMP}/playwright-browsers" >> "$GITHUB_ENV"
 
       - name: Buscar checkpoint de esta rama y workflow
         id: checkpoint

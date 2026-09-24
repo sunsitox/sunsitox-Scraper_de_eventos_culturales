@@ -58,6 +58,9 @@ jobs:
       EVENT_DESCRIPTION_MAX_CHARS: "8000"
       SUPABASE_DELETE_EXPIRED: "true"
       SUPABASE_RECONCILE_STALE: "true"
+      SUPABASE_TIMEOUT_SECONDS: "60"
+      SUPABASE_MAX_RETRIES: "3"
+      SUPABASE_RETRY_MAX_WAIT_SECONDS: "30"
 
     steps:
       - name: Descargar repositorio

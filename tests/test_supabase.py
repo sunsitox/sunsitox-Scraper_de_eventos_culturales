@@ -296,6 +296,51 @@ class SupabaseExporterTests(unittest.TestCase):
 
 
 class SupabaseConfigurationTests(unittest.TestCase):
+    def test_select_retries_a_transient_timeout(self):
+        class Session:
+            def __init__(self):
+                self.headers = {}
+                self.calls = 0
+
+            def get(self, url, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    raise requests.ReadTimeout("temporary")
+                response = requests.Response()
+                response.status_code = 200
+                response._content = b'[{"name":"Organizador"}]'
+                return response
+
+        session = Session()
+        client = SupabaseRestClient(
+            SupabaseConfig(
+                "https://example.supabase.co",
+                "sb_secret_example",
+                max_retries=1,
+            ),
+            session,
+        )
+        with patch("eventos.services.supabase.time.sleep") as sleep:
+            rows = client.select("organizers", {"select": "name"})
+        self.assertEqual(rows, [{"name": "Organizador"}])
+        self.assertEqual(session.calls, 2)
+        sleep.assert_called_once_with(1.0)
+
+    def test_publish_rpc_does_not_retry_after_a_timeout(self):
+        client = SupabaseRestClient(
+            SupabaseConfig("https://example.supabase.co", "sb_secret_example")
+        )
+        with patch.object(client, "rpc", return_value=[]) as rpc:
+            client.publish_staged_catalog(
+                "00000000-0000-0000-0000-000000000001",
+                reconcile_source_ids=[],
+                seen_at="2099-01-01T00:00:00+00:00",
+                delete_expired=True,
+                current_time="2099-01-01T12:00:00-03:00",
+                day_start="2099-01-01T00:00:00-03:00",
+            )
+        self.assertFalse(rpc.call_args.kwargs["retryable"])
+
     def test_project_ref_is_extracted_from_url_or_markdown_link(self):
         expected = "ngwkehuewmjykiiujqic"
         self.assertEqual(resolve_project_ref(expected), expected)

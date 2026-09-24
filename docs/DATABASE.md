@@ -25,8 +25,8 @@ erDiagram
     EVENTS ||--o{ MEDIA_ASSETS : contiene
     EVENTS ||--o| EVENT_PROVENANCE : conserva_evidencia
     AUTH_USERS ||--|| PROFILES : posee
-    AUTH_USERS ||--o{ FAVORITES : guarda
-    EVENTS ||--o{ FAVORITES : recibe
+    AUTH_USERS ||--o{ USER_EVENT_INTERACTIONS : registra
+    EVENTS ||--o{ USER_EVENT_INTERACTIONS : recibe
     AUTH_USERS ||--o{ REPORTS : crea
     EVENTS ||--o{ REPORTS : recibe
 ```
@@ -55,7 +55,7 @@ vigentes entre ejecuciones mediante sus identificadores deterministas.
 | Tabla | Finalidad |
 |---|---|
 | `profiles` | Perfil público mínimo asociado a Supabase Auth. |
-| `favorites` | Eventos guardados por una persona autenticada. |
+| `user_event_interactions` | Señales de comportamiento para recomendaciones: visualizaciones, interés, descarte, aperturas y compartidos. |
 | `reports` | Avisos de usuarios sobre información incorrecta o problemática. |
 
 ## 2. Convenciones generales
@@ -271,15 +271,20 @@ Extensión mínima de `auth.users`. Se crea automáticamente después del regist
 | `created_at` | `timestamptz` | Automático | Creación del perfil. |
 | `updated_at` | `timestamptz` | Automático | Última modificación. |
 
-### `favorites`
+### `user_event_interactions`
 
-Relación entre usuarios y eventos guardados.
+Historial de señales que usa el motor de recomendaciones. No almacena un puntaje enviado por el
+cliente: el backend asigna el peso de cada tipo de interacción y puede reducir su efecto con el
+paso del tiempo.
 
 | Columna | Tipo | Requisito | Significado |
 |---|---|---|---|
-| `user_id` | `uuid` | PK compuesta, FK → `auth.users.id` | Usuario propietario. |
-| `event_id` | `uuid` | PK compuesta, FK → `events.id` | Evento guardado. |
-| `created_at` | `timestamptz` | Automático | Momento en que se marcó como favorito. |
+| `id` | `uuid` | PK, automático | Identificador de la interacción. |
+| `user_id` | `uuid` | FK obligatoria → `auth.users.id` | Persona que generó la señal. |
+| `event_id` | `uuid` | FK obligatoria → `events.id` | Evento asociado a la señal. |
+| `interaction_type` | `text` | Obligatorio, controlado | Acción: ver detalle, abrir fuente u oficial, mostrar interés, descartar, compartir o reportar. |
+| `occurred_at` | `timestamptz` | Automático | Momento de la interacción. |
+| `metadata` | `jsonb` | Objeto vacío por defecto | Contexto no sensible opcional, por ejemplo superficie de origen. |
 
 ### `reports`
 

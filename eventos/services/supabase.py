@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -97,6 +98,8 @@ class SupabaseConfig:
     secret_key: str
     batch_size: int = 200
     timeout: int = 60
+    max_retries: int = 3
+    retry_max_wait_seconds: int = 30
 
     @classmethod
     def from_env(cls) -> "SupabaseConfig":
@@ -114,9 +117,20 @@ class SupabaseConfig:
         try:
             batch_size = max(1, int(os.getenv("SUPABASE_BATCH_SIZE", "200")))
             timeout = max(1, int(os.getenv("SUPABASE_TIMEOUT_SECONDS", "60")))
+            max_retries = max(0, int(os.getenv("SUPABASE_MAX_RETRIES", "3")))
+            retry_max_wait_seconds = max(
+                1, int(os.getenv("SUPABASE_RETRY_MAX_WAIT_SECONDS", "30"))
+            )
         except ValueError as exc:
             raise SupabaseError("Los límites de Supabase deben ser números enteros.") from exc
-        return cls(url=url, secret_key=secret_key, batch_size=batch_size, timeout=timeout)
+        return cls(
+            url=url,
+            secret_key=secret_key,
+            batch_size=batch_size,
+            timeout=timeout,
+            max_retries=max_retries,
+            retry_max_wait_seconds=retry_max_wait_seconds,
+        )
 
 
 class SupabaseRestClient:
@@ -151,25 +165,90 @@ class SupabaseRestClient:
                 f"(HTTP {response.status_code}): {detail}"
             ) from exc
 
+    @staticmethod
+    def _retry_after_seconds(response: requests.Response | None) -> float | None:
+        if response is None:
+            return None
+        raw_value = clean(response.headers.get("Retry-After"))
+        try:
+            return max(0.0, float(raw_value)) if raw_value else None
+        except ValueError:
+            return None
+
+    def _retry_delay(self, attempt: int, response: requests.Response | None = None) -> float:
+        provider_delay = self._retry_after_seconds(response)
+        if provider_delay is not None:
+            return min(provider_delay, float(self.config.retry_max_wait_seconds))
+        return min(float(2 ** (attempt - 1)), float(self.config.retry_max_wait_seconds))
+
+    def _request_with_retry(
+        self,
+        request: Any,
+        *,
+        table: str,
+        operation: str,
+        retryable: bool = True,
+    ) -> requests.Response:
+        """Reintenta solo operaciones REST idempotentes ante fallas transitorias."""
+        retries = self.config.max_retries if retryable else 0
+        last_error: requests.RequestException | None = None
+        for attempt in range(retries + 1):
+            response: requests.Response | None = None
+            try:
+                response = request()
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                last_error = exc
+                transient = True
+            else:
+                transient = response.status_code in {408, 425, 429, 500, 502, 503, 504}
+                if not transient:
+                    return response
+
+            if attempt >= retries:
+                if last_error is not None:
+                    raise last_error
+                assert response is not None
+                return response
+
+            delay = self._retry_delay(attempt + 1, response)
+            logging.warning(
+                "Supabase: %s en %s tuvo una falla temporal; reintento %s/%s en %.1f s.",
+                operation,
+                table,
+                attempt + 1,
+                retries,
+                delay,
+            )
+            time.sleep(delay)
+        raise SupabaseError(f"No se pudo completar {operation} en {table}")
+
     def upsert(self, table: str, rows: list[dict[str, Any]], on_conflict: str = "id") -> None:
         if not rows:
             return
         for start in range(0, len(rows), self.config.batch_size):
             batch = rows[start : start + self.config.batch_size]
-            response = self.session.post(
-                self._endpoint(table),
-                params={"on_conflict": on_conflict},
-                headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
-                json=batch,
-                timeout=self.config.timeout,
+            response = self._request_with_retry(
+                lambda: self.session.post(
+                    self._endpoint(table),
+                    params={"on_conflict": on_conflict},
+                    headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                    json=batch,
+                    timeout=self.config.timeout,
+                ),
+                table=table,
+                operation="upsert",
             )
             self._validate(response, table, "upsert")
 
     def select(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
-        response = self.session.get(
-            self._endpoint(table),
-            params=params,
-            timeout=self.config.timeout,
+        response = self._request_with_retry(
+            lambda: self.session.get(
+                self._endpoint(table),
+                params=params,
+                timeout=self.config.timeout,
+            ),
+            table=table,
+            operation="select",
         )
         self._validate(response, table, "select")
         payload = response.json()
@@ -177,11 +256,22 @@ class SupabaseRestClient:
             raise SupabaseError(f"Supabase devolvió una respuesta no válida al consultar {table}")
         return [row for row in payload if isinstance(row, dict)]
 
-    def rpc(self, function: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
-        response = self.session.post(
-            f"{self.config.url}/rest/v1/rpc/{function}",
-            json=payload,
-            timeout=self.config.timeout,
+    def rpc(
+        self,
+        function: str,
+        payload: dict[str, Any],
+        *,
+        retryable: bool = True,
+    ) -> list[dict[str, Any]]:
+        response = self._request_with_retry(
+            lambda: self.session.post(
+                f"{self.config.url}/rest/v1/rpc/{function}",
+                json=payload,
+                timeout=self.config.timeout,
+            ),
+            table=function,
+            operation="rpc",
+            retryable=retryable,
         )
         self._validate(response, function, "rpc")
         result = response.json()
@@ -230,21 +320,29 @@ class SupabaseRestClient:
             return
         for start in range(0, len(values), self.config.batch_size):
             batch = values[start : start + self.config.batch_size]
-            response = self.session.delete(
-                self._endpoint(table),
-                params={column: f"in.({','.join(batch)})"},
-                headers={"Prefer": "return=minimal"},
-                timeout=self.config.timeout,
+            response = self._request_with_retry(
+                lambda: self.session.delete(
+                    self._endpoint(table),
+                    params={column: f"in.({','.join(batch)})"},
+                    headers={"Prefer": "return=minimal"},
+                    timeout=self.config.timeout,
+                ),
+                table=table,
+                operation="delete",
             )
             self._validate(response, table, "delete")
 
     def delete_where(self, table: str, filters: dict[str, str]) -> None:
         """Elimina por filtros PostgREST explícitos sin descargar las filas."""
-        response = self.session.delete(
-            self._endpoint(table),
-            params=filters,
-            headers={"Prefer": "return=minimal"},
-            timeout=self.config.timeout,
+        response = self._request_with_retry(
+            lambda: self.session.delete(
+                self._endpoint(table),
+                params=filters,
+                headers={"Prefer": "return=minimal"},
+                timeout=self.config.timeout,
+            ),
+            table=table,
+            operation="delete",
         )
         self._validate(response, table, "delete")
 
@@ -333,6 +431,9 @@ class SupabaseRestClient:
                 "p_current_time": current_time,
                 "p_day_start": day_start,
             },
+            # Si el servidor completó la transacción pero la respuesta se perdió,
+            # repetir esta RPC fallaría porque el staging ya fue eliminado.
+            retryable=False,
         )
         result = rows[0] if rows else {}
         return {

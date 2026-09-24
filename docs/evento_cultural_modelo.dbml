@@ -103,14 +103,13 @@ Table profiles {
   updated_at timestamptz [not null, default: `now()`]
 }
 
-Table favorites {
-  user_id uuid [ref: > auth_users.id]
-  event_id uuid [ref: > events.id]
-  created_at timestamptz [not null, default: `now()`]
-
-  indexes {
-    (user_id, event_id) [pk]
-  }
+Table user_event_interactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > auth_users.id]
+  event_id uuid [not null, ref: > events.id]
+  interaction_type text [not null, note: 'view_detail | open_source | open_official_site | interested | not_interested | share | report']
+  occurred_at timestamptz [not null, default: `now()`]
+  metadata jsonb [not null, default: `{}`]
 }
 
 Table reports {

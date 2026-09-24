@@ -19,7 +19,7 @@ en [`DATABASE.md`](DATABASE.md).
 | `event_provenance` | Texto original y OCR privados para trazabilidad y para evitar reprocesamiento |
 | `scrape_runs` | Estado, cantidad y metadatos de cada ejecución local o de GitHub Actions |
 | `catalog_staging` | Fragmentos privados previos a la publicación atómica del catálogo |
-| `profiles`, `favorites`, `reports` | Base futura de la aplicación; no interviene en el scraper |
+| `profiles`, `user_event_interactions`, `reports` | Base futura de la aplicación; no interviene en el scraper |
 
 Los identificadores que genera Python son UUID v5 deterministas. Ejecutar dos veces el mismo
 scraping actualiza las filas existentes mediante `upsert` y no crea duplicados. Las categorías

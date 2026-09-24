@@ -21,14 +21,15 @@
 \definecolor{azul}{HTML}{17365D}
 \definecolor{celeste}{HTML}{EAF2F8}
 \definecolor{gris}{HTML}{4A5568}
-\hypersetup{colorlinks=true,linkcolor=azul,urlcolor=azul,citecolor=azul,pdftitle={Documentación técnica del scraper de eventos culturales}}
+\hypersetup{colorlinks=true,linkcolor=azul,urlcolor=azul,citecolor=azul,pdftitle={Documentaci\'{o}n t\'{e}cnica del scraper de eventos culturales}}
 \setlist{noitemsep,topsep=3pt}
 \setlength{\parskip}{5pt}
 \setlength{\parindent}{0pt}
 \pagestyle{fancy}
 \fancyhf{}
+\setlength{\headheight}{14pt}
 \lhead{Scraper de eventos culturales de Chile}
-\rhead{Documentación técnica}
+\rhead{Documentaci\'{o}n t\'{e}cnica}
 \cfoot{\thepage}
 
 \lstdefinestyle{codigo}{
@@ -49,16 +50,16 @@
 \centering
 \vspace*{2cm}
 {\color{azul}\rule{\textwidth}{1.4pt}}\\[1.3cm]
-{\Huge\bfseries Documentación técnica\\[0.25cm]
+{\Huge\bfseries Documentaci\'{o}n t\'{e}cnica\\[0.25cm]
 del scraper de eventos culturales de Chile\par}
 \vspace{0.8cm}
-{\Large Arquitectura, operación y mantenimiento\par}
+{\Large Arquitectura, operaci\'{o}n y mantenimiento\par}
 \vfill
 \begin{tabular}{rl}
-\textbf{Alcance:} & extracción, normalización y sincronización del catálogo \\
-\textbf{Versión documental:} & septiembre de 2026 \\
-\textbf{Tecnologías principales:} & Python, Playwright, NVIDIA NIM, SQLite y Supabase \\
-\textbf{Ejecución automatizada:} & GitHub Actions \\
+\textbf{Alcance:} & extracci\'{o}n, normalizaci\'{o}n y sincronizaci\'{o}n del cat\'{a}logo \\
+\textbf{Versi\'{o}n documental:} & septiembre de 2026 \\
+\textbf{Tecnolog\'{i}as principales:} & Python, Playwright, NVIDIA NIM, SQLite y Supabase \\
+\textbf{Ejecuci\'{o}n automatizada:} & GitHub Actions \\
 \end{tabular}
 \vfill
 {\color{azul}\rule{\textwidth}{1.4pt}}
@@ -67,28 +68,28 @@ del scraper de eventos culturales de Chile\par}
 \tableofcontents
 \newpage
 
-\section{Propósito y alcance}
+\section{Prop\'{o}sito y alcance}
 
-El proyecto construye y mantiene un catálogo de eventos culturales de Chile a partir de fuentes públicas: agendas municipales, espacios culturales, universidades, portales sectoriales y tiqueteras. Su objetivo no es copiar una página completa, sino convertir información pública heterogénea en registros comparables, trazables y vigentes.
+El proyecto construye y mantiene un cat\'{a}logo de eventos culturales de Chile a partir de fuentes p\'{u}blicas: agendas municipales, espacios culturales, universidades, portales sectoriales y tiqueteras. Su objetivo no es copiar una p\'{a}gina completa, sino convertir informaci\'{o}n p\'{u}blica heterog\'{e}nea en registros comparables, trazables y vigentes.
 
 El scraper abarca cuatro responsabilidades:
 \begin{enumerate}
   \item descubrir y extraer eventos desde fuentes configuradas;
-  \item normalizar fechas, ubicación, categorías, organizador y enlaces;
-  \item enriquecer solo los casos necesarios mediante OCR y redacción asistida por IA;
-  \item exportar un respaldo local y sincronizar el catálogo publicado con Supabase.
+  \item normalizar fechas, ubicaci\'{o}n, categor\'{i}as, organizador y enlaces;
+  \item enriquecer solo los casos necesarios mediante OCR y redacci\'{o}n asistida por IA;
+  \item exportar un respaldo local y sincronizar el cat\'{a}logo publicado con Supabase.
 \end{enumerate}
 
-No forma parte de este documento el frontend, la autenticación de usuarios ni el algoritmo de recomendaciones. El scraper alimenta el catálogo que dichas capas consumirán posteriormente.
+No forma parte de este documento el frontend, la autenticaci\'{o}n de usuarios ni el algoritmo de recomendaciones. El scraper alimenta el cat\'{a}logo que dichas capas consumir\'{a}n posteriormente.
 
-\subsection{Principios de diseño}
+\subsection{Principios de dise\~{n}o}
 
 \begin{itemize}
-  \item \textbf{Trazabilidad:} cada evento conserva fuente, URL original, URL oficial cuando existe, método de extracción y momento de captura.
+  \item \textbf{Trazabilidad:} cada evento conserva fuente, URL original, URL oficial cuando existe, m\'{e}todo de extracci\'{o}n y momento de captura.
   \item \textbf{Preferencia por datos estructurados:} API, JSON-LD, WordPress REST y tarjetas declarativas se usan antes que OCR o modelos de IA.
-  \item \textbf{Mínima presión sobre los sitios:} se respeta el ritmo por dominio, hay caché condicional HTTP y la concurrencia es acotada.
-  \item \textbf{Idempotencia:} repetir una ejecución actualiza registros existentes y evita duplicados mediante identificadores estables y deduplicación.
-  \item \textbf{Resiliencia:} una fuente caída, un afiche ilegible o una respuesta transitoria de NVIDIA no detienen el resto del proceso.
+  \item \textbf{M\'{i}nima presi\'{o}n sobre los sitios:} se respeta el ritmo por dominio, hay cach\'{e} condicional HTTP y la concurrencia es acotada.
+  \item \textbf{Idempotencia:} repetir una ejecuci\'{o}n actualiza registros existentes y evita duplicados mediante identificadores estables y deduplicaci\'{o}n.
+  \item \textbf{Resiliencia:} una fuente ca\'{i}da, un afiche ilegible o una respuesta transitoria de NVIDIA no detienen el resto del proceso.
   \item \textbf{Vigencia:} se eliminan eventos vencidos y registros que una fuente completa ya no publica.
 \end{itemize}
 
@@ -101,14 +102,14 @@ No forma parte de este documento el frontend, la autenticación de usuarios ni e
   store/.style={draw=gris, cylinder, shape border rotate=90, aspect=.28, align=center, minimum height=13mm, minimum width=28mm, fill=gray!12},
   arrow/.style={-Latex, thick, draw=azul}
 ]
-\node[box] (sources) {Fuentes públicas\\JSON de configuración};
+\node[box] (sources) {Fuentes p\'{u}blicas\\JSON de configuraci\'{o}n};
 \node[box, right=of sources] (connectors) {Conectores\\y extractores};
-\node[box, right=of connectors] (process) {Saneamiento,\\deduplicación y ubicación};
-\node[box, below=of process] (nim) {NVIDIA NIM\\OCR, redacción y apoyo};
-\node[store, below=of connectors] (state) {SQLite\\checkpoint, cola y caché};
-\node[box, right=of process] (export) {Exportación\\JSON y CSV};
-\node[store, below=of export] (supabase) {Supabase/PostgreSQL\\staging y catálogo};
-\node[box, below=of supabase] (actions) {GitHub Actions\\ejecución programada};
+\node[box, right=of connectors] (process) {Saneamiento,\\deduplicaci\'{o}n y ubicaci\'{o}n};
+\node[box, below=of process] (nim) {NVIDIA NIM\\OCR, redacci\'{o}n y apoyo};
+\node[store, below=of connectors] (state) {SQLite\\checkpoint, cola y cach\'{e}};
+\node[box, right=of process] (export) {Exportaci\'{o}n\\JSON y CSV};
+\node[store, below=of export] (supabase) {Supabase/PostgreSQL\\staging y cat\'{a}logo};
+\node[box, below=of supabase] (actions) {GitHub Actions\\ejecuci\'{o}n programada};
 \draw[arrow] (sources) -- (connectors);
 \draw[arrow] (connectors) -- (process);
 \draw[arrow] (process) -- (export);
@@ -126,67 +127,67 @@ No forma parte de este documento el frontend, la autenticación de usuarios ni e
 
 \begin{longtable}{p{0.25\textwidth}p{0.67\textwidth}}
 \toprule
-\textbf{Patrón} & \textbf{Aplicación} \\
+\textbf{Patr\'{o}n} & \textbf{Aplicaci\'{o}n} \\
 \midrule
 \endhead
-Strategy & Cada conector implementa una estrategia de extracción independiente para una familia de sitios. \\
+Strategy & Cada conector implementa una estrategia de extracci\'{o}n independiente para una familia de sitios. \\
 Factory/Registry & \texttt{ConnectorFactory} selecciona el conector a partir del campo \texttt{connector} del JSON de fuente. \\
-Repository & \texttt{SourceRepository} carga, valida y entrega la configuración declarativa de \texttt{sources/}. \\
-Pipeline & \texttt{EventPipeline} orquesta fases en orden, sin acoplar la lógica a una página concreta. \\
-Inyección de dependencias & HTTP, estado, exportador y servicios remotos pueden sustituirse en pruebas. \\
+Repository & \texttt{SourceRepository} carga, valida y entrega la configuraci\'{o}n declarativa de \texttt{sources/}. \\
+Pipeline & \texttt{EventPipeline} orquesta fases en orden, sin acoplar la l\'{o}gica a una p\'{a}gina concreta. \\
+Inyecci\'{o}n de dependencias & HTTP, estado, exportador y servicios remotos pueden sustituirse en pruebas. \\
 \bottomrule
 \end{longtable}
 
 \section{Estructura del repositorio}
 
 \begin{lstlisting}
-scrape_events.py              Punto de entrada de la ejecución
-eventos/                      Paquete de extracción y procesamiento
+scrape_events.py              Punto de entrada de la ejecuci\'{o}n
+eventos/                      Paquete de extracci\'{o}n y procesamiento
   connectors/                 Estrategias por tipo de fuente
   extractors/                 Lectores reutilizables, por ejemplo JSON-LD
   services/                   NVIDIA NIM y cliente REST de Supabase
-  source_validation/          Pipeline independiente de validación de fuentes
+  source_validation/          Pipeline independiente de validaci\'{o}n de fuentes
 sources/                      Un JSON por fuente y plantillas reutilizables
-state/                        SQLite local: checkpoint, cola de IA y caché
-data/                         Exportaciones JSON, CSV, métricas y auditorías
+state/                        SQLite local: checkpoint, cola de IA y cach\'{e}
+data/                         Exportaciones JSON, CSV, m\'{e}tricas y auditor\'{i}as
 supabase/migrations/          Migraciones SQL versionadas
 tools/                        Utilidades, entre ellas copia consistente de estado
-tests/                        Pruebas unitarias y de integración simulada
-.github/workflows/            Automatización en GitHub Actions
-docs/                         Documentación del scraper
+tests/                        Pruebas unitarias y de integraci\'{o}n simulada
+.github/workflows/            Automatizaci\'{o}n en GitHub Actions
+docs/                         Documentaci\'{o}n del scraper
 \end{lstlisting}
 
-Los directorios \texttt{state/}, \texttt{data/}, cachés y el archivo \texttt{.env} son locales y no se publican en Git. Las fuentes, las migraciones, las pruebas y el workflow sí deben versionarse.
+Los directorios \texttt{state/}, \texttt{data/}, cach\'{e}s y el archivo \texttt{.env} son locales y no se publican en Git. Las fuentes, las migraciones, las pruebas y el workflow s\'{i} deben versionarse.
 
 \section{Fuentes de datos}
 
-La configuración vigente contiene 21 fuentes permanentes y una fuente estacional, activa únicamente en septiembre. Chile Cultura y Ticketplus aportan alcance nacional; las demás agregan profundidad territorial o temática.
+La configuraci\'{o}n vigente contiene 21 fuentes permanentes y una fuente estacional, activa \'{u}nicamente en septiembre. Chile Cultura y Ticketplus aportan alcance nacional; las dem\'{a}s agregan profundidad territorial o tem\'{a}tica.
 
 \small
 \begin{longtable}{p{0.38\textwidth}p{0.24\textwidth}p{0.30\textwidth}}
 \toprule
-\textbf{Fuente} & \textbf{Cobertura} & \textbf{Método principal} \\
+\textbf{Fuente} & \textbf{Cobertura} & \textbf{M\'{e}todo principal} \\
 \midrule
 \endhead
-Chile Cultura & Nacional, 16 regiones & API pública paginada \\
-Maipú en Común & Región Metropolitana & API de aplicación mediante Playwright \\
+Chile Cultura & Nacional, 16 regiones & API p\'{u}blica paginada \\
+Maip\'{u} en Com\'{u}n & Regi\'{o}n Metropolitana & API de aplicaci\'{o}n mediante Playwright \\
 Centro Cultural GAM & Santiago & JSON-LD \\
 Centro Cultural La Moneda & Santiago & Tarjetas HTML declarativas \\
 Centro Cultural CEINA & Santiago & Tarjetas HTML declarativas \\
-Valpo Cultura & Valparaíso & The Events Calendar API \\
-Espacio Cultural Viña del Mar & Valparaíso & The Events Calendar API \\
-Teatro Municipal de Viña del Mar & Valparaíso & JSON-LD \\
+Valpo Cultura & Valpara\'{i}so & The Events Calendar API \\
+Espacio Cultural Vi\~{n}a del Mar & Valpara\'{i}so & The Events Calendar API \\
+Teatro Municipal de Vi\~{n}a del Mar & Valpara\'{i}so & JSON-LD \\
 Agenda Cultural UOH & O'Higgins & WordPress REST \\
 Rancagua Cultura & O'Higgins & JSON-LD \\
 Agenda Universidad de Talca & Maule & Tarjetas HTML declarativas \\
-Corporación Cultural de Iquique & Tarapacá & Tarjetas institucionales \\
+Corporaci\'{o}n Cultural de Iquique & Tarapac\'{a} & Tarjetas institucionales \\
 Centro de Arte Molino Machmar & Los Lagos & Tarjetas institucionales \\
 Enoturismo Chile & Interregional & WordPress/EventON \\
 FISA & Varias regiones & Portafolio oficial \\
-Espacio Riesco & Región Metropolitana & Tarjetas HTML declarativas \\
-Parque Cultural de Valparaíso & Valparaíso & WordPress REST \\
-Fundación CorpArtes & Región Metropolitana & Tarjetas HTML declarativas \\
-Cultura Vitacura & Región Metropolitana & Tarjetas HTML declarativas \\
+Espacio Riesco & Regi\'{o}n Metropolitana & Tarjetas HTML declarativas \\
+Parque Cultural de Valpara\'{i}so & Valpara\'{i}so & WordPress REST \\
+Fundaci\'{o}n CorpArtes & Regi\'{o}n Metropolitana & Tarjetas HTML declarativas \\
+Cultura Vitacura & Regi\'{o}n Metropolitana & Tarjetas HTML declarativas \\
 Santiago Cultura & Santiago & WordPress/EventON incremental \\
 Ticketplus Chile & Nacional, 16 regiones & Selector regional y fichas estructuradas \\
 FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
@@ -194,18 +195,18 @@ FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
 \end{longtable}
 \normalsize
 
-Cada archivo en \texttt{sources/} declara URL, región, comuna, organizador, conector, categorías por defecto, límites de paginación y, cuando corresponda, metadatos estáticos de ubicación. Añadir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea código nuevo cuando la estructura no coincide con ninguno.
+Cada archivo en \texttt{sources/} declara URL, regi\'{o}n, comuna, organizador, conector, categor\'{i}as por defecto, l\'{i}mites de paginaci\'{o}n y, cuando corresponda, metadatos est\'{a}ticos de ubicaci\'{o}n. A\~{n}adir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea c\'{o}digo nuevo cuando la estructura no coincide con ninguno.
 
 \section{Flujo de procesamiento}
 
-\subsection{Fase de extracción}
+\subsection{Fase de extracci\'{o}n}
 
 \begin{enumerate}
   \item Se cargan las fuentes habilitadas para el mes actual; FondasChile se omite fuera de septiembre.
   \item Las fuentes se agrupan por dominio. Hasta cuatro dominios se procesan en paralelo, pero cada dominio conserva su propio ritmo.
-  \item Cada conector devuelve objetos \texttt{Event} con un esquema común.
-  \item Se aplican limpieza inicial, deduplicación interna y validación de disponibilidad de fichas.
-  \item Cada fuente exitosa o vacía de forma válida queda registrada en un checkpoint local.
+  \item Cada conector devuelve objetos \texttt{Event} con un esquema com\'{u}n.
+  \item Se aplican limpieza inicial, deduplicaci\'{o}n interna y validaci\'{o}n de disponibilidad de fichas.
+  \item Cada fuente exitosa o vac\'{i}a de forma v\'{a}lida queda registrada en un checkpoint local.
 \end{enumerate}
 
 La fase puede ejecutarse sin IA ni Supabase:
@@ -214,87 +215,87 @@ La fase puede ejecutarse sin IA ni Supabase:
 python scrape_events.py --phase extract --local-only
 \end{lstlisting}
 
-\subsection{Fase de procesamiento y publicación}
+\subsection{Fase de procesamiento y publicaci\'{o}n}
 
 \begin{enumerate}
-  \item Se recupera la extracción compatible más reciente desde SQLite.
+  \item Se recupera la extracci\'{o}n compatible m\'{a}s reciente desde SQLite.
   \item Se sanea el texto globalmente y se deduplican eventos entre fuentes.
-  \item Se aplican valores de ubicación declarados por fuente y reglas deterministas.
-  \item Si Supabase está habilitado, se detectan eventos nuevos, modificados, suprimidos o pertenecientes a organizadores bloqueados.
-  \item Solo el subconjunto pendiente pasa por OCR, redacción y enriquecimiento de ubicación.
-  \item Se ejecuta el filtro cultural, se descartan fechas inválidas o vencidas y se exportan JSON/CSV.
-  \item Se publica de forma atómica en Supabase y se reconcilian registros obsoletos de fuentes completas.
+  \item Se aplican valores de ubicaci\'{o}n declarados por fuente y reglas deterministas.
+  \item Si Supabase est\'{a} habilitado, se detectan eventos nuevos, modificados, suprimidos o pertenecientes a organizadores bloqueados.
+  \item Solo el subconjunto pendiente pasa por OCR, redacci\'{o}n y enriquecimiento de ubicaci\'{o}n.
+  \item Se ejecuta el filtro cultural, se descartan fechas inv\'{a}lidas o vencidas y se exportan JSON/CSV.
+  \item Se publica de forma at\'{o}mica en Supabase y se reconcilian registros obsoletos de fuentes completas.
 \end{enumerate}
 
 \begin{lstlisting}
 python scrape_events.py --phase process --supabase
 \end{lstlisting}
 
-La separación de fases permite conservar el trabajo de extracción si se agota una cuota de IA o falla temporalmente el destino remoto.
+La separaci\'{o}n de fases permite conservar el trabajo de extracci\'{o}n si se agota una cuota de IA o falla temporalmente el destino remoto.
 
-\section{Modelo canónico de evento}
+\section{Modelo can\'{o}nico de evento}
 
-Todo conector entrega el mismo modelo lógico. Los campos fundamentales son \texttt{title}, \texttt{start\_date}, \texttt{end\_date}, \texttt{venue}, \texttt{location}, \texttt{commune}, \texttt{region}, \texttt{organizer}, \texttt{categories}, \texttt{source\_url} y \texttt{official\_url}.
+Todo conector entrega el mismo modelo l\'{o}gico. Los campos fundamentales son \texttt{title}, \texttt{start\_date}, \texttt{end\_date}, \texttt{venue}, \texttt{location}, \texttt{commune}, \texttt{region}, \texttt{organizer}, \texttt{categories}, \texttt{source\_url} y \texttt{official\_url}.
 
-Las categorías son siempre una lista, no una cadena. Un mismo evento puede pertenecer simultáneamente a música, familiar y gratuito. En el JSON se guarda como arreglo; en CSV se serializa como JSON dentro de una celda; en Supabase se normaliza mediante \texttt{categories} y \texttt{event\_categories}.
+Las categor\'{i}as son siempre una lista, no una cadena. Un mismo evento puede pertenecer simult\'{a}neamente a m\'{u}sica, familiar y gratuito. En el JSON se guarda como arreglo; en CSV se serializa como JSON dentro de una celda; en Supabase se normaliza mediante \texttt{categories} y \texttt{event\_categories}.
 
-La ubicación se resuelve de forma transparente y cada evento incluye:
+La ubicaci\'{o}n se resuelve de forma transparente y cada evento incluye:
 \begin{itemize}
-  \item \texttt{location}: texto canónico que nunca queda vacío;
-  \item \texttt{location\_precision}: dirección, recinto, comuna, región o modalidad en línea;
-  \item \texttt{location\_source}: dato publicado, configuración de fuente, regla determinista, IA o fallback geográfico.
+  \item \texttt{location}: texto can\'{o}nico que nunca queda vac\'{i}o;
+  \item \texttt{location\_precision}: direcci\'{o}n, recinto, comuna, regi\'{o}n o modalidad en l\'{i}nea;
+  \item \texttt{location\_source}: dato publicado, configuraci\'{o}n de fuente, regla determinista, IA o fallback geogr\'{a}fico.
 \end{itemize}
 
-No se inventan direcciones. Cuando la evidencia solo permite identificar una comuna o región, se conserva exactamente ese nivel y se marca la menor precisión.
+No se inventan direcciones. Cuando la evidencia solo permite identificar una comuna o regi\'{o}n, se conserva exactamente ese nivel y se marca la menor precisi\'{o}n.
 
 \section{Saneamiento, vigencia y filtro cultural}
 
-El saneador común elimina HTML residual, reglas CSS, scripts, shortcodes de WordPress/WPBakery y descripciones desproporcionadas. Esto evita que cambios visuales de un sitio se conviertan en contenido del catálogo.
+El saneador com\'{u}n elimina HTML residual, reglas CSS, scripts, shortcodes de WordPress/WPBakery y descripciones desproporcionadas. Esto evita que cambios visuales de un sitio se conviertan en contenido del cat\'{a}logo.
 
-Un evento se conserva solo si tiene fecha de inicio válida y todavía está vigente. La validación de URL retira fichas confirmadas con HTTP 404/410 o páginas de error inequívocas; ante timeout, bloqueo temporal o error 5xx el registro se conserva para no borrar información por una falla pasajera.
+Un evento se conserva solo si tiene fecha de inicio v\'{a}lida y todav\'{i}a est\'{a} vigente. La validaci\'{o}n de URL retira fichas confirmadas con HTTP 404/410 o p\'{a}ginas de error inequ\'{i}vocas; ante timeout, bloqueo temporal o error 5xx el registro se conserva para no borrar informaci\'{o}n por una falla pasajera.
 
-El filtro cultural funciona después de sanear y consolidar, antes de exportar. Tiene tres resultados: \textit{aceptado}, \textit{revisión} y \textit{excluido}. Se incluye una actividad cuando su finalidad principal o una dimensión sustantiva permite crear, expresar, conservar, interpretar o compartir cultura. El formato por sí solo ---por ejemplo ``feria'' o ``exposición''--- no determina el resultado. La auditoría queda en \texttt{data/cultural\_filter\_audit.json}.
+El filtro cultural funciona despu\'{e}s de sanear y consolidar, antes de exportar. Tiene tres resultados: \textit{aceptado}, \textit{revisi\'{o}n} y \textit{excluido}. Se incluye una actividad cuando su finalidad principal o una dimensi\'{o}n sustantiva permite crear, expresar, conservar, interpretar o compartir cultura. El formato por s\'{i} solo ---por ejemplo ``feria'' o ``exposici\'{o}n''--- no determina el resultado. La auditor\'{i}a queda en \texttt{data/cultural\_filter\_audit.json}.
 
 \section{IA, OCR y control de cuota}
 
-NVIDIA NIM se usa como respaldo, no como requisito de extracción. Las fuentes con API, JSON-LD, WordPress REST o tarjetas declarativas se procesan sin consumir IA. La IA interviene únicamente en estos casos:
+NVIDIA NIM se usa como respaldo, no como requisito de extracci\'{o}n. Las fuentes con API, JSON-LD, WordPress REST o tarjetas declarativas se procesan sin consumir IA. La IA interviene \'{u}nicamente en estos casos:
 \begin{itemize}
   \item OCR de afiches cuando existe imagen y no hay texto suficiente;
-  \item redacción editorial de texto público, preservando el texto de origen para trazabilidad;
-  \item resolución por lotes de ubicaciones incompletas.
+  \item redacci\'{o}n editorial de texto p\'{u}blico, preservando el texto de origen para trazabilidad;
+  \item resoluci\'{o}n por lotes de ubicaciones incompletas.
 \end{itemize}
 
-El límite global se configura en 40 solicitudes por minuto. Todas las llamadas, incluso las iniciadas por fuentes concurrentes, pasan por el mismo regulador. Las respuestas 429, \texttt{Retry-After} y secuencias de timeouts activan pausas controladas; los pendientes no se pierden, sino que pasan a una cola SQLite para una ejecución futura.
+El l\'{i}mite global se configura en 40 solicitudes por minuto. Todas las llamadas, incluso las iniciadas por fuentes concurrentes, pasan por el mismo regulador. Las respuestas 429, \texttt{Retry-After} y secuencias de timeouts activan pausas controladas; los pendientes no se pierden, sino que pasan a una cola SQLite para una ejecuci\'{o}n futura.
 
-Antes de usar IA, Supabase compara URL original y una clave combinada de título, fecha y lugar. Si el evento ya existe y no cambió, se reutilizan OCR y texto editorial previamente almacenados. Esta deduplicación reduce costo, tiempo y consumo de cuota.
+Antes de usar IA, Supabase compara URL original y una clave combinada de t\'{i}tulo, fecha y lugar. Si el evento ya existe y no cambi\'{o}, se reutilizan OCR y texto editorial previamente almacenados. Esta deduplicaci\'{o}n reduce costo, tiempo y consumo de cuota.
 
-\section{Estado local, checkpoints y recuperación}
+\section{Estado local, checkpoints y recuperaci\'{o}n}
 
-El archivo \texttt{state/pipeline.sqlite3} conserva datos operativos, no el catálogo público. Incluye checkpoints por fuente, una extracción consolidada, cola de enriquecimiento, caché de resultados de IA, métricas y caché HTTP condicional.
+El archivo \texttt{state/pipeline.sqlite3} conserva datos operativos, no el cat\'{a}logo p\'{u}blico. Incluye checkpoints por fuente, una extracci\'{o}n consolidada, cola de enriquecimiento, cach\'{e} de resultados de IA, m\'{e}tricas y cach\'{e} HTTP condicional.
 
-En GitHub Actions, el estado se guarda como artefacto después de la extracción y nuevamente al finalizar. Una ejecución siguiente restaura el último artefacto disponible. Por ello, si falla la fase de enriquecimiento, no se requiere volver a recorrer todas las páginas: la siguiente corrida retoma los eventos y pendientes conservados.
+En GitHub Actions, el estado se guarda como artefacto despu\'{e}s de la extracci\'{o}n y nuevamente al finalizar. Una ejecuci\'{o}n siguiente restaura el \'{u}ltimo artefacto disponible. Por ello, si falla la fase de enriquecimiento, no se requiere volver a recorrer todas las p\'{a}ginas: la siguiente corrida retoma los eventos y pendientes conservados.
 
-No deben ejecutarse simultáneamente dos procesos que compartan el mismo estado local o las mismas credenciales de IA. El workflow usa un grupo de concurrencia para impedir que dos ejecuciones programadas se solapen.
+No deben ejecutarse simult\'{a}neamente dos procesos que compartan el mismo estado local o las mismas credenciales de IA. El workflow usa un grupo de concurrencia para impedir que dos ejecuciones programadas se solapen.
 
-\section{Exportación y sincronización con Supabase}
+\section{Exportaci\'{o}n y sincronizaci\'{o}n con Supabase}
 
-El respaldo local se escribe en \texttt{data/events.json}, \texttt{data/events.csv}, archivos separados por región, \texttt{data/source\_metrics.json} y \texttt{data/run\_summary.json}. Al final de cada corrida se informa un total consolidado y duración completa.
+El respaldo local se escribe en \texttt{data/events.json}, \texttt{data/events.csv}, archivos separados por regi\'{o}n, \texttt{data/source\_metrics.json} y \texttt{data/run\_summary.json}. Al final de cada corrida se informa un total consolidado y duraci\'{o}n completa.
 
-La sincronización remota usa la API REST de Supabase con una clave secreta exclusiva del proceso de ingesta. El flujo remoto es:
+La sincronizaci\'{o}n remota usa la API REST de Supabase con una clave secreta exclusiva del proceso de ingesta. El flujo remoto es:
 \begin{enumerate}
-  \item transformar eventos en entidades normalizadas: fuentes, organizadores, comunas, categorías, eventos, procedencia y medios;
+  \item transformar eventos en entidades normalizadas: fuentes, organizadores, comunas, categor\'{i}as, eventos, procedencia y medios;
   \item cargar fragmentos en la tabla privada \texttt{catalog\_staging};
   \item ejecutar una RPC transaccional que publica todo el lote o no publica nada;
-  \item eliminar eventos vencidos y filas no vistas por fuentes cuya extracción terminó correctamente.
+  \item eliminar eventos vencidos y filas no vistas por fuentes cuya extracci\'{o}n termin\'{o} correctamente.
 \end{enumerate}
 
-Las consultas y cargas REST idempotentes reintentan fallas transitorias de red, timeout o disponibilidad temporal. La RPC de publicación no se repite automáticamente si su respuesta se pierde, porque podría haber finalizado y eliminado el staging; así se evita una publicación ambigua o duplicada.
+Las consultas y cargas REST idempotentes reintentan fallas transitorias de red, timeout o disponibilidad temporal. La RPC de publicaci\'{o}n no se repite autom\'{a}ticamente si su respuesta se pierde, porque podr\'{i}a haber finalizado y eliminado el staging; as\'{i} se evita una publicaci\'{o}n ambigua o duplicada.
 
-Los organizadores bloqueados y los eventos suprimidos individualmente se excluyen antes de OCR, redacción y publicación. De este modo, una solicitud de retiro no se revierte en la siguiente ejecución.
+Los organizadores bloqueados y los eventos suprimidos individualmente se excluyen antes de OCR, redacci\'{o}n y publicaci\'{o}n. De este modo, una solicitud de retiro no se revierte en la siguiente ejecuci\'{o}n.
 
-\section{Configuración}
+\section{Configuraci\'{o}n}
 
-La configuración sensible vive en \texttt{.env} y nunca debe subirse al repositorio. Las variables mínimas para sincronizar son:
+La configuraci\'{o}n sensible vive en \texttt{.env} y nunca debe subirse al repositorio. Las variables m\'{i}nimas para sincronizar son:
 
 \begin{lstlisting}
 SUPABASE_ENABLED=true
@@ -303,7 +304,7 @@ SUPABASE_SECRET_KEY=sb_secret_...
 NVIDIA_API_KEY=...
 \end{lstlisting}
 
-Los parámetros operativos más relevantes son:
+Los par\'{a}metros operativos m\'{a}s relevantes son:
 
 \begin{longtable}{p{0.37\textwidth}p{0.55\textwidth}}
 \toprule
@@ -311,38 +312,38 @@ Los parámetros operativos más relevantes son:
 \midrule
 \endhead
 \texttt{SOURCE\_WORKERS} & Dominios procesados en paralelo; valor recomendado: 4. \\
-\texttt{HTTP\_CACHE\_ENABLED} & Activa revalidación condicional mediante ETag y Last-Modified. \\
-\texttt{NVIDIA\_RPM\_LIMIT} & Límite global de solicitudes a NVIDIA; configurado en 40. \\
-\texttt{NVIDIA\_OCR\_MAX\_IMAGES} & Máximo de afiches OCR por ejecución. \\
-\texttt{NVIDIA\_REWRITE\_ENABLED} & Activa o desactiva la redacción editorial. \\
+\texttt{HTTP\_CACHE\_ENABLED} & Activa revalidaci\'{o}n condicional mediante ETag y Last-Modified. \\
+\texttt{NVIDIA\_RPM\_LIMIT} & L\'{i}mite global de solicitudes a NVIDIA; configurado en 40. \\
+\texttt{NVIDIA\_OCR\_MAX\_IMAGES} & M\'{a}ximo de afiches OCR por ejecuci\'{o}n. \\
+\texttt{NVIDIA\_REWRITE\_ENABLED} & Activa o desactiva la redacci\'{o}n editorial. \\
 \texttt{SUPABASE\_DELETE\_EXPIRED} & Elimina eventos ya terminados al sincronizar. \\
 \texttt{SUPABASE\_RECONCILE\_STALE} & Retira eventos no vistos por fuentes completas. \\
 \texttt{SUPABASE\_MAX\_RETRIES} & Reintentos de operaciones REST idempotentes ante fallas transitorias. \\
-\texttt{SUPABASE\_RETRY\_MAX\_WAIT\_SECONDS} & Espera máxima entre reintentos REST. \\
+\texttt{SUPABASE\_RETRY\_MAX\_WAIT\_SECONDS} & Espera m\'{a}xima entre reintentos REST. \\
 \bottomrule
 \end{longtable}
 
-\section{Automatización con GitHub Actions}
+\section{Automatizaci\'{o}n con GitHub Actions}
 
 El workflow instala dependencias, Chromium para Playwright, ejecuta las pruebas, restaura checkpoints, extrae, conserva un artefacto, enriquece y sincroniza. Las credenciales se almacenan como \textit{Repository secrets}: \texttt{SUPABASE\_URL}, \texttt{SUPABASE\_SECRET\_KEY} y \texttt{NVIDIA\_API\_KEY}.
 
-La programación vigente es diaria a las 00:15 en la zona \texttt{America/Santiago}. El workflow conserva también \texttt{workflow\_dispatch}, por lo que puede iniciarse manualmente desde la pestaña Actions. La zona horaria evita tener que ajustar el cron por horario de verano.
+La programaci\'{o}n vigente es diaria a las 00:15 en la zona \texttt{America/Santiago}. El workflow conserva tambi\'{e}n \texttt{workflow\_dispatch}, por lo que puede iniciarse manualmente desde la pesta\~{n}a Actions. La zona horaria evita tener que ajustar el cron por horario de verano.
 
-\section{Operación y mantenimiento}
+\section{Operaci\'{o}n y mantenimiento}
 
 \subsection{Comandos frecuentes}
 
 \begin{lstlisting}
-# Instalación en Windows
+# Instalaci\'{o}n en Windows
 instalar.bat
 
-# Ejecución completa local
+# Ejecuci\'{o}n completa local
 ejecutar.bat
 
 # Pruebas
 python -m unittest discover -s tests -v
 
-# Solo extracción, sin IA ni Supabase
+# Solo extracci\'{o}n, sin IA ni Supabase
 python scrape_events.py --phase extract --local-only
 
 # Procesar un checkpoint y sincronizar
@@ -355,36 +356,36 @@ migrar_supabase.bat
 \subsection{Cuando una fuente cambia o cae}
 
 \begin{enumerate}
-  \item revisar el resumen de fuente y confirmar si falló, quedó parcial o está legítimamente vacía;
-  \item comprobar la página pública y sus términos de uso antes de cambiar la extracción;
-  \item preferir API, JSON-LD o endpoint público sobre selectores visuales frágiles;
+  \item revisar el resumen de fuente y confirmar si fall\'{o}, qued\'{o} parcial o est\'{a} leg\'{i}timamente vac\'{i}a;
+  \item comprobar la p\'{a}gina p\'{u}blica y sus t\'{e}rminos de uso antes de cambiar la extracci\'{o}n;
+  \item preferir API, JSON-LD o endpoint p\'{u}blico sobre selectores visuales fr\'{a}giles;
   \item actualizar solo el JSON de fuente cuando un conector declarativo sea suficiente;
   \item agregar o corregir pruebas con una muestra representativa antes de habilitar la fuente;
-  \item si la fuente falla, mantenerla fuera de la reconciliación: el pipeline no borra su catálogo por una extracción parcial o fallida.
+  \item si la fuente falla, mantenerla fuera de la reconciliaci\'{o}n: el pipeline no borra su cat\'{a}logo por una extracci\'{o}n parcial o fallida.
 \end{enumerate}
 
-La guía operativa detallada está en \texttt{sources/GUIA\_AGREGAR\_Y\_MANTENER\_FUENTES.md}.
+La gu\'{i}a operativa detallada est\'{a} en \texttt{sources/GUIA\_AGREGAR\_Y\_MANTENER\_FUENTES.md}.
 
-\section{Seguridad, límites y consideraciones}
+\section{Seguridad, l\'{i}mites y consideraciones}
 
-Se consultan únicamente recursos públicos. Antes de añadir una fuente se deben revisar términos de uso, \texttt{robots.txt}, condiciones de reutilización y frecuencia razonable de consulta. El sistema no debe intentar evadir bloqueos ni acceder a contenido privado.
+Se consultan \'{u}nicamente recursos p\'{u}blicos. Antes de a\~{n}adir una fuente se deben revisar t\'{e}rminos de uso, \texttt{robots.txt}, condiciones de reutilizaci\'{o}n y frecuencia razonable de consulta. El sistema no debe intentar evadir bloqueos ni acceder a contenido privado.
 
-Las claves secretas de Supabase se usan solamente por el scraper o GitHub Actions; nunca deben llegar al frontend, a archivos versionados ni a logs. El OCR y la redacción automatizada no sustituyen una revisión editorial ni garantizan, por sí solos, conformidad con políticas de terceros.
+Las claves secretas de Supabase se usan solamente por el scraper o GitHub Actions; nunca deben llegar al frontend, a archivos versionados ni a logs. El OCR y la redacci\'{o}n automatizada no sustituyen una revisi\'{o}n editorial ni garantizan, por s\'{i} solos, conformidad con pol\'{i}ticas de terceros.
 
 \section{Documentos relacionados}
 
 \begin{itemize}
-  \item \texttt{README.md}: instalación, comandos cotidianos y visión rápida.
+  \item \texttt{README.md}: instalaci\'{o}n, comandos cotidianos y visi\'{o}n r\'{a}pida.
   \item \texttt{docs/ARCHITECTURE.md}: detalle de componentes y patrones.
   \item \texttt{docs/SOURCES.md}: procedencia y tratamiento de cada fuente.
-  \item \texttt{docs/RESUMABLE\_PIPELINE.md}: checkpoints, cola de IA y recuperación.
-  \item \texttt{docs/SUPABASE.md}: migraciones, seguridad y operación de la sincronización.
-  \item \texttt{docs/DEFINICION\_Y\_FILTRO\_CULTURAL.md}: criterio de inclusión cultural.
+  \item \texttt{docs/RESUMABLE\_PIPELINE.md}: checkpoints, cola de IA y recuperaci\'{o}n.
+  \item \texttt{docs/SUPABASE.md}: migraciones, seguridad y operaci\'{o}n de la sincronizaci\'{o}n.
+  \item \texttt{docs/DEFINICION\_Y\_FILTRO\_CULTURAL.md}: criterio de inclusi\'{o}n cultural.
 \end{itemize}
 
 \vfill
 \begin{center}
-\color{gris}\small Fin de la documentación técnica del scraper.
+\color{gris}\small Fin de la documentaci\'{o}n t\'{e}cnica del scraper.
 \end{center}
 
 \end{document}

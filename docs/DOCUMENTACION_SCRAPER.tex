@@ -1,0 +1,390 @@
+% Compilar con: pdflatex DOCUMENTACION_SCRAPER.tex
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+
+\definecolor{azul}{HTML}{17365D}
+\definecolor{celeste}{HTML}{EAF2F8}
+\definecolor{gris}{HTML}{4A5568}
+\hypersetup{colorlinks=true,linkcolor=azul,urlcolor=azul,citecolor=azul,pdftitle={Documentación técnica del scraper de eventos culturales}}
+\setlist{noitemsep,topsep=3pt}
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Scraper de eventos culturales de Chile}
+\rhead{Documentación técnica}
+\cfoot{\thepage}
+
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{celeste},
+  frame=single,
+  rulecolor=\color{azul!30},
+  breaklines=true,
+  columns=fullflexible
+}
+\lstset{style=codigo}
+
+\newcommand{\proyecto}{\texttt{Scraper de eventos culturales}}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\color{azul}\rule{\textwidth}{1.4pt}}\\[1.3cm]
+{\Huge\bfseries Documentación técnica\\[0.25cm]
+del scraper de eventos culturales de Chile\par}
+\vspace{0.8cm}
+{\Large Arquitectura, operación y mantenimiento\par}
+\vfill
+\begin{tabular}{rl}
+\textbf{Alcance:} & extracción, normalización y sincronización del catálogo \\
+\textbf{Versión documental:} & septiembre de 2026 \\
+\textbf{Tecnologías principales:} & Python, Playwright, NVIDIA NIM, SQLite y Supabase \\
+\textbf{Ejecución automatizada:} & GitHub Actions \\
+\end{tabular}
+\vfill
+{\color{azul}\rule{\textwidth}{1.4pt}}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Propósito y alcance}
+
+El proyecto construye y mantiene un catálogo de eventos culturales de Chile a partir de fuentes públicas: agendas municipales, espacios culturales, universidades, portales sectoriales y tiqueteras. Su objetivo no es copiar una página completa, sino convertir información pública heterogénea en registros comparables, trazables y vigentes.
+
+El scraper abarca cuatro responsabilidades:
+\begin{enumerate}
+  \item descubrir y extraer eventos desde fuentes configuradas;
+  \item normalizar fechas, ubicación, categorías, organizador y enlaces;
+  \item enriquecer solo los casos necesarios mediante OCR y redacción asistida por IA;
+  \item exportar un respaldo local y sincronizar el catálogo publicado con Supabase.
+\end{enumerate}
+
+No forma parte de este documento el frontend, la autenticación de usuarios ni el algoritmo de recomendaciones. El scraper alimenta el catálogo que dichas capas consumirán posteriormente.
+
+\subsection{Principios de diseño}
+
+\begin{itemize}
+  \item \textbf{Trazabilidad:} cada evento conserva fuente, URL original, URL oficial cuando existe, método de extracción y momento de captura.
+  \item \textbf{Preferencia por datos estructurados:} API, JSON-LD, WordPress REST y tarjetas declarativas se usan antes que OCR o modelos de IA.
+  \item \textbf{Mínima presión sobre los sitios:} se respeta el ritmo por dominio, hay caché condicional HTTP y la concurrencia es acotada.
+  \item \textbf{Idempotencia:} repetir una ejecución actualiza registros existentes y evita duplicados mediante identificadores estables y deduplicación.
+  \item \textbf{Resiliencia:} una fuente caída, un afiche ilegible o una respuesta transitoria de NVIDIA no detienen el resto del proceso.
+  \item \textbf{Vigencia:} se eliminan eventos vencidos y registros que una fuente completa ya no publica.
+\end{itemize}
+
+\section{Arquitectura general}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=8mm and 10mm,
+  box/.style={draw=azul, rounded corners=3pt, align=center, minimum height=10mm, minimum width=30mm, fill=celeste},
+  store/.style={draw=gris, cylinder, shape border rotate=90, aspect=.28, align=center, minimum height=13mm, minimum width=28mm, fill=gray!12},
+  arrow/.style={-Latex, thick, draw=azul}
+]
+\node[box] (sources) {Fuentes públicas\\JSON de configuración};
+\node[box, right=of sources] (connectors) {Conectores\\y extractores};
+\node[box, right=of connectors] (process) {Saneamiento,\\deduplicación y ubicación};
+\node[box, below=of process] (nim) {NVIDIA NIM\\OCR, redacción y apoyo};
+\node[store, below=of connectors] (state) {SQLite\\checkpoint, cola y caché};
+\node[box, right=of process] (export) {Exportación\\JSON y CSV};
+\node[store, below=of export] (supabase) {Supabase/PostgreSQL\\staging y catálogo};
+\node[box, below=of supabase] (actions) {GitHub Actions\\ejecución programada};
+\draw[arrow] (sources) -- (connectors);
+\draw[arrow] (connectors) -- (process);
+\draw[arrow] (process) -- (export);
+\draw[arrow] (process) -- (nim);
+\draw[arrow] (nim) -| (process);
+\draw[arrow] (connectors) -- (state);
+\draw[arrow] (nim) -- (state);
+\draw[arrow] (export) -- (supabase);
+\draw[arrow] (actions) -- (state);
+\draw[arrow] (actions) -- (supabase);
+\end{tikzpicture}
+\end{center}
+
+\subsection{Patrones aplicados}
+
+\begin{longtable}{p{0.25\textwidth}p{0.67\textwidth}}
+\toprule
+\textbf{Patrón} & \textbf{Aplicación} \\
+\midrule
+\endhead
+Strategy & Cada conector implementa una estrategia de extracción independiente para una familia de sitios. \\
+Factory/Registry & \texttt{ConnectorFactory} selecciona el conector a partir del campo \texttt{connector} del JSON de fuente. \\
+Repository & \texttt{SourceRepository} carga, valida y entrega la configuración declarativa de \texttt{sources/}. \\
+Pipeline & \texttt{EventPipeline} orquesta fases en orden, sin acoplar la lógica a una página concreta. \\
+Inyección de dependencias & HTTP, estado, exportador y servicios remotos pueden sustituirse en pruebas. \\
+\bottomrule
+\end{longtable}
+
+\section{Estructura del repositorio}
+
+\begin{lstlisting}
+scrape_events.py              Punto de entrada de la ejecución
+eventos/                      Paquete de extracción y procesamiento
+  connectors/                 Estrategias por tipo de fuente
+  extractors/                 Lectores reutilizables, por ejemplo JSON-LD
+  services/                   NVIDIA NIM y cliente REST de Supabase
+  source_validation/          Pipeline independiente de validación de fuentes
+sources/                      Un JSON por fuente y plantillas reutilizables
+state/                        SQLite local: checkpoint, cola de IA y caché
+data/                         Exportaciones JSON, CSV, métricas y auditorías
+supabase/migrations/          Migraciones SQL versionadas
+tools/                        Utilidades, entre ellas copia consistente de estado
+tests/                        Pruebas unitarias y de integración simulada
+.github/workflows/            Automatización en GitHub Actions
+docs/                         Documentación del scraper
+\end{lstlisting}
+
+Los directorios \texttt{state/}, \texttt{data/}, cachés y el archivo \texttt{.env} son locales y no se publican en Git. Las fuentes, las migraciones, las pruebas y el workflow sí deben versionarse.
+
+\section{Fuentes de datos}
+
+La configuración vigente contiene 21 fuentes permanentes y una fuente estacional, activa únicamente en septiembre. Chile Cultura y Ticketplus aportan alcance nacional; las demás agregan profundidad territorial o temática.
+
+\small
+\begin{longtable}{p{0.38\textwidth}p{0.24\textwidth}p{0.30\textwidth}}
+\toprule
+\textbf{Fuente} & \textbf{Cobertura} & \textbf{Método principal} \\
+\midrule
+\endhead
+Chile Cultura & Nacional, 16 regiones & API pública paginada \\
+Maipú en Común & Región Metropolitana & API de aplicación mediante Playwright \\
+Centro Cultural GAM & Santiago & JSON-LD \\
+Centro Cultural La Moneda & Santiago & Tarjetas HTML declarativas \\
+Centro Cultural CEINA & Santiago & Tarjetas HTML declarativas \\
+Valpo Cultura & Valparaíso & The Events Calendar API \\
+Espacio Cultural Viña del Mar & Valparaíso & The Events Calendar API \\
+Teatro Municipal de Viña del Mar & Valparaíso & JSON-LD \\
+Agenda Cultural UOH & O'Higgins & WordPress REST \\
+Rancagua Cultura & O'Higgins & JSON-LD \\
+Agenda Universidad de Talca & Maule & Tarjetas HTML declarativas \\
+Corporación Cultural de Iquique & Tarapacá & Tarjetas institucionales \\
+Centro de Arte Molino Machmar & Los Lagos & Tarjetas institucionales \\
+Enoturismo Chile & Interregional & WordPress/EventON \\
+FISA & Varias regiones & Portafolio oficial \\
+Espacio Riesco & Región Metropolitana & Tarjetas HTML declarativas \\
+Parque Cultural de Valparaíso & Valparaíso & WordPress REST \\
+Fundación CorpArtes & Región Metropolitana & Tarjetas HTML declarativas \\
+Cultura Vitacura & Región Metropolitana & Tarjetas HTML declarativas \\
+Santiago Cultura & Santiago & WordPress/EventON incremental \\
+Ticketplus Chile & Nacional, 16 regiones & Selector regional y fichas estructuradas \\
+FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+Cada archivo en \texttt{sources/} declara URL, región, comuna, organizador, conector, categorías por defecto, límites de paginación y, cuando corresponda, metadatos estáticos de ubicación. Añadir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea código nuevo cuando la estructura no coincide con ninguno.
+
+\section{Flujo de procesamiento}
+
+\subsection{Fase de extracción}
+
+\begin{enumerate}
+  \item Se cargan las fuentes habilitadas para el mes actual; FondasChile se omite fuera de septiembre.
+  \item Las fuentes se agrupan por dominio. Hasta cuatro dominios se procesan en paralelo, pero cada dominio conserva su propio ritmo.
+  \item Cada conector devuelve objetos \texttt{Event} con un esquema común.
+  \item Se aplican limpieza inicial, deduplicación interna y validación de disponibilidad de fichas.
+  \item Cada fuente exitosa o vacía de forma válida queda registrada en un checkpoint local.
+\end{enumerate}
+
+La fase puede ejecutarse sin IA ni Supabase:
+
+\begin{lstlisting}
+python scrape_events.py --phase extract --local-only
+\end{lstlisting}
+
+\subsection{Fase de procesamiento y publicación}
+
+\begin{enumerate}
+  \item Se recupera la extracción compatible más reciente desde SQLite.
+  \item Se sanea el texto globalmente y se deduplican eventos entre fuentes.
+  \item Se aplican valores de ubicación declarados por fuente y reglas deterministas.
+  \item Si Supabase está habilitado, se detectan eventos nuevos, modificados, suprimidos o pertenecientes a organizadores bloqueados.
+  \item Solo el subconjunto pendiente pasa por OCR, redacción y enriquecimiento de ubicación.
+  \item Se ejecuta el filtro cultural, se descartan fechas inválidas o vencidas y se exportan JSON/CSV.
+  \item Se publica de forma atómica en Supabase y se reconcilian registros obsoletos de fuentes completas.
+\end{enumerate}
+
+\begin{lstlisting}
+python scrape_events.py --phase process --supabase
+\end{lstlisting}
+
+La separación de fases permite conservar el trabajo de extracción si se agota una cuota de IA o falla temporalmente el destino remoto.
+
+\section{Modelo canónico de evento}
+
+Todo conector entrega el mismo modelo lógico. Los campos fundamentales son \texttt{title}, \texttt{start\_date}, \texttt{end\_date}, \texttt{venue}, \texttt{location}, \texttt{commune}, \texttt{region}, \texttt{organizer}, \texttt{categories}, \texttt{source\_url} y \texttt{official\_url}.
+
+Las categorías son siempre una lista, no una cadena. Un mismo evento puede pertenecer simultáneamente a música, familiar y gratuito. En el JSON se guarda como arreglo; en CSV se serializa como JSON dentro de una celda; en Supabase se normaliza mediante \texttt{categories} y \texttt{event\_categories}.
+
+La ubicación se resuelve de forma transparente y cada evento incluye:
+\begin{itemize}
+  \item \texttt{location}: texto canónico que nunca queda vacío;
+  \item \texttt{location\_precision}: dirección, recinto, comuna, región o modalidad en línea;
+  \item \texttt{location\_source}: dato publicado, configuración de fuente, regla determinista, IA o fallback geográfico.
+\end{itemize}
+
+No se inventan direcciones. Cuando la evidencia solo permite identificar una comuna o región, se conserva exactamente ese nivel y se marca la menor precisión.
+
+\section{Saneamiento, vigencia y filtro cultural}
+
+El saneador común elimina HTML residual, reglas CSS, scripts, shortcodes de WordPress/WPBakery y descripciones desproporcionadas. Esto evita que cambios visuales de un sitio se conviertan en contenido del catálogo.
+
+Un evento se conserva solo si tiene fecha de inicio válida y todavía está vigente. La validación de URL retira fichas confirmadas con HTTP 404/410 o páginas de error inequívocas; ante timeout, bloqueo temporal o error 5xx el registro se conserva para no borrar información por una falla pasajera.
+
+El filtro cultural funciona después de sanear y consolidar, antes de exportar. Tiene tres resultados: \textit{aceptado}, \textit{revisión} y \textit{excluido}. Se incluye una actividad cuando su finalidad principal o una dimensión sustantiva permite crear, expresar, conservar, interpretar o compartir cultura. El formato por sí solo ---por ejemplo ``feria'' o ``exposición''--- no determina el resultado. La auditoría queda en \texttt{data/cultural\_filter\_audit.json}.
+
+\section{IA, OCR y control de cuota}
+
+NVIDIA NIM se usa como respaldo, no como requisito de extracción. Las fuentes con API, JSON-LD, WordPress REST o tarjetas declarativas se procesan sin consumir IA. La IA interviene únicamente en estos casos:
+\begin{itemize}
+  \item OCR de afiches cuando existe imagen y no hay texto suficiente;
+  \item redacción editorial de texto público, preservando el texto de origen para trazabilidad;
+  \item resolución por lotes de ubicaciones incompletas.
+\end{itemize}
+
+El límite global se configura en 40 solicitudes por minuto. Todas las llamadas, incluso las iniciadas por fuentes concurrentes, pasan por el mismo regulador. Las respuestas 429, \texttt{Retry-After} y secuencias de timeouts activan pausas controladas; los pendientes no se pierden, sino que pasan a una cola SQLite para una ejecución futura.
+
+Antes de usar IA, Supabase compara URL original y una clave combinada de título, fecha y lugar. Si el evento ya existe y no cambió, se reutilizan OCR y texto editorial previamente almacenados. Esta deduplicación reduce costo, tiempo y consumo de cuota.
+
+\section{Estado local, checkpoints y recuperación}
+
+El archivo \texttt{state/pipeline.sqlite3} conserva datos operativos, no el catálogo público. Incluye checkpoints por fuente, una extracción consolidada, cola de enriquecimiento, caché de resultados de IA, métricas y caché HTTP condicional.
+
+En GitHub Actions, el estado se guarda como artefacto después de la extracción y nuevamente al finalizar. Una ejecución siguiente restaura el último artefacto disponible. Por ello, si falla la fase de enriquecimiento, no se requiere volver a recorrer todas las páginas: la siguiente corrida retoma los eventos y pendientes conservados.
+
+No deben ejecutarse simultáneamente dos procesos que compartan el mismo estado local o las mismas credenciales de IA. El workflow usa un grupo de concurrencia para impedir que dos ejecuciones programadas se solapen.
+
+\section{Exportación y sincronización con Supabase}
+
+El respaldo local se escribe en \texttt{data/events.json}, \texttt{data/events.csv}, archivos separados por región, \texttt{data/source\_metrics.json} y \texttt{data/run\_summary.json}. Al final de cada corrida se informa un total consolidado y duración completa.
+
+La sincronización remota usa la API REST de Supabase con una clave secreta exclusiva del proceso de ingesta. El flujo remoto es:
+\begin{enumerate}
+  \item transformar eventos en entidades normalizadas: fuentes, organizadores, comunas, categorías, eventos, procedencia y medios;
+  \item cargar fragmentos en la tabla privada \texttt{catalog\_staging};
+  \item ejecutar una RPC transaccional que publica todo el lote o no publica nada;
+  \item eliminar eventos vencidos y filas no vistas por fuentes cuya extracción terminó correctamente.
+\end{enumerate}
+
+Las consultas y cargas REST idempotentes reintentan fallas transitorias de red, timeout o disponibilidad temporal. La RPC de publicación no se repite automáticamente si su respuesta se pierde, porque podría haber finalizado y eliminado el staging; así se evita una publicación ambigua o duplicada.
+
+Los organizadores bloqueados y los eventos suprimidos individualmente se excluyen antes de OCR, redacción y publicación. De este modo, una solicitud de retiro no se revierte en la siguiente ejecución.
+
+\section{Configuración}
+
+La configuración sensible vive en \texttt{.env} y nunca debe subirse al repositorio. Las variables mínimas para sincronizar son:
+
+\begin{lstlisting}
+SUPABASE_ENABLED=true
+SUPABASE_URL=https://TU_PROYECTO.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+NVIDIA_API_KEY=...
+\end{lstlisting}
+
+Los parámetros operativos más relevantes son:
+
+\begin{longtable}{p{0.37\textwidth}p{0.55\textwidth}}
+\toprule
+\textbf{Variable} & \textbf{Finalidad} \\
+\midrule
+\endhead
+\texttt{SOURCE\_WORKERS} & Dominios procesados en paralelo; valor recomendado: 4. \\
+\texttt{HTTP\_CACHE\_ENABLED} & Activa revalidación condicional mediante ETag y Last-Modified. \\
+\texttt{NVIDIA\_RPM\_LIMIT} & Límite global de solicitudes a NVIDIA; configurado en 40. \\
+\texttt{NVIDIA\_OCR\_MAX\_IMAGES} & Máximo de afiches OCR por ejecución. \\
+\texttt{NVIDIA\_REWRITE\_ENABLED} & Activa o desactiva la redacción editorial. \\
+\texttt{SUPABASE\_DELETE\_EXPIRED} & Elimina eventos ya terminados al sincronizar. \\
+\texttt{SUPABASE\_RECONCILE\_STALE} & Retira eventos no vistos por fuentes completas. \\
+\texttt{SUPABASE\_MAX\_RETRIES} & Reintentos de operaciones REST idempotentes ante fallas transitorias. \\
+\texttt{SUPABASE\_RETRY\_MAX\_WAIT\_SECONDS} & Espera máxima entre reintentos REST. \\
+\bottomrule
+\end{longtable}
+
+\section{Automatización con GitHub Actions}
+
+El workflow instala dependencias, Chromium para Playwright, ejecuta las pruebas, restaura checkpoints, extrae, conserva un artefacto, enriquece y sincroniza. Las credenciales se almacenan como \textit{Repository secrets}: \texttt{SUPABASE\_URL}, \texttt{SUPABASE\_SECRET\_KEY} y \texttt{NVIDIA\_API\_KEY}.
+
+La programación vigente es diaria a las 00:15 en la zona \texttt{America/Santiago}. El workflow conserva también \texttt{workflow\_dispatch}, por lo que puede iniciarse manualmente desde la pestaña Actions. La zona horaria evita tener que ajustar el cron por horario de verano.
+
+\section{Operación y mantenimiento}
+
+\subsection{Comandos frecuentes}
+
+\begin{lstlisting}
+# Instalación en Windows
+instalar.bat
+
+# Ejecución completa local
+ejecutar.bat
+
+# Pruebas
+python -m unittest discover -s tests -v
+
+# Solo extracción, sin IA ni Supabase
+python scrape_events.py --phase extract --local-only
+
+# Procesar un checkpoint y sincronizar
+python scrape_events.py --phase process --supabase
+
+# Aplicar migraciones de Supabase en Windows
+migrar_supabase.bat
+\end{lstlisting}
+
+\subsection{Cuando una fuente cambia o cae}
+
+\begin{enumerate}
+  \item revisar el resumen de fuente y confirmar si falló, quedó parcial o está legítimamente vacía;
+  \item comprobar la página pública y sus términos de uso antes de cambiar la extracción;
+  \item preferir API, JSON-LD o endpoint público sobre selectores visuales frágiles;
+  \item actualizar solo el JSON de fuente cuando un conector declarativo sea suficiente;
+  \item agregar o corregir pruebas con una muestra representativa antes de habilitar la fuente;
+  \item si la fuente falla, mantenerla fuera de la reconciliación: el pipeline no borra su catálogo por una extracción parcial o fallida.
+\end{enumerate}
+
+La guía operativa detallada está en \texttt{sources/GUIA\_AGREGAR\_Y\_MANTENER\_FUENTES.md}.
+
+\section{Seguridad, límites y consideraciones}
+
+Se consultan únicamente recursos públicos. Antes de añadir una fuente se deben revisar términos de uso, \texttt{robots.txt}, condiciones de reutilización y frecuencia razonable de consulta. El sistema no debe intentar evadir bloqueos ni acceder a contenido privado.
+
+Las claves secretas de Supabase se usan solamente por el scraper o GitHub Actions; nunca deben llegar al frontend, a archivos versionados ni a logs. El OCR y la redacción automatizada no sustituyen una revisión editorial ni garantizan, por sí solos, conformidad con políticas de terceros.
+
+\section{Documentos relacionados}
+
+\begin{itemize}
+  \item \texttt{README.md}: instalación, comandos cotidianos y visión rápida.
+  \item \texttt{docs/ARCHITECTURE.md}: detalle de componentes y patrones.
+  \item \texttt{docs/SOURCES.md}: procedencia y tratamiento de cada fuente.
+  \item \texttt{docs/RESUMABLE\_PIPELINE.md}: checkpoints, cola de IA y recuperación.
+  \item \texttt{docs/SUPABASE.md}: migraciones, seguridad y operación de la sincronización.
+  \item \texttt{docs/DEFINICION\_Y\_FILTRO\_CULTURAL.md}: criterio de inclusión cultural.
+\end{itemize}
+
+\vfill
+\begin{center}
+\color{gris}\small Fin de la documentación técnica del scraper.
+\end{center}
+
+\end{document}

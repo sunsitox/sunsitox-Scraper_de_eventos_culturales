@@ -2,10 +2,10 @@ name: Extraer eventos y sincronizar Supabase
 
 on:
   workflow_dispatch:
-  # La periodicidad se agregará cuando esté definida:
-  # schedule:
-  #   - cron: "..."
-  #     timezone: "America/Santiago"
+  schedule:
+    # Madrugada de Chile: deja margen para una corrida extensa y evita el minuto 00.
+    - cron: "15 0 * * *"
+      timezone: "America/Santiago"
 
 permissions:
   contents: read

@@ -44,6 +44,10 @@ data/*
 
 # Logs y archivos temporales
 *.log
+*.aux
+*.out
+*.toc
+*.synctex.gz
 work/validation-checkpoints-*/
 *.tmp
 *.bak

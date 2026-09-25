@@ -279,6 +279,11 @@ No desactives la verificación TLS automáticamente. `verify_ssl: false` reduce 
 seguridad y solo debe emplearse temporalmente cuando se haya comprobado que el
 dominio es legítimo y el único problema es su cadena de certificados.
 
+Si la fuente se reemplaza de manera definitiva, elimina su JSON y agrega su nombre exacto a
+`retired_source_names` en `settings.json`. En la siguiente sincronización exitosa, el pipeline
+eliminará solo los eventos de esa fuente en Supabase. No agregues una fuente a esa lista si
+planeas reactivarla: bastará con mantenerla temporalmente con `enabled: false`.
+
 ## 10. Si cambia la estructura de la página
 
 Síntomas frecuentes:

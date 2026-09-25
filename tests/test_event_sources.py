@@ -7,6 +7,7 @@ from eventos.connectors.eventon import event_from_microdata
 from eventos.connectors.fisa import expo_categories, fisa_date_range, location_fields
 from eventos.connectors.generic import candidate_links
 from eventos.connectors.ticketplus import TicketplusChileConnector, ticketplus_regional_sources
+from eventos.connectors.teatro_biobio import TeatroBiobioConnector, event_datetime
 from eventos.connectors.html_cards import (
     HtmlCardsConnector,
     spanish_abbreviated_range,
@@ -35,6 +36,56 @@ class FisaTests(unittest.TestCase):
         location = location_fields("Espacio Riesco, Avenida El Salto 5000, Huechuraba")
         self.assertEqual(categories, ["Exposición", "Feria", "Salud"])
         self.assertEqual(location[2:], ("Huechuraba", "Región Metropolitana de Santiago"))
+
+
+class TeatroBiobioTests(unittest.TestCase):
+    def test_extracts_visible_numeric_date_and_time(self):
+        content = "<h2>28/09/2099</h2><p>Fecha y hora: Lunes 28 de septiembre, 19:30 h.</p>"
+        self.assertEqual(event_datetime(content), "2099-09-28T19:30:00")
+
+    def test_reads_only_cartelera_posts_without_nvidia(self):
+        class Response:
+            headers = {"X-WP-TotalPages": "1"}
+
+            def json(self):
+                return [{
+                    "title": {"rendered": "<em>Obra de prueba</em>"},
+                    "content": {"rendered": "<p>Fecha y hora: 28 de septiembre de 2099, 19:30 h.</p>"},
+                    "link": "https://teatrobiobio.cl/obra-de-prueba/",
+                    "_embedded": {
+                        "wp:term": [[{"name": "Cartelera"}, {"name": "Teatro"}]],
+                        "wp:featuredmedia": [{"source_url": "https://teatrobiobio.cl/afiche.jpg"}],
+                    },
+                }]
+
+        class Http:
+            def __init__(self):
+                self.calls = []
+
+            def get_json(self, url, *, params):
+                self.calls.append((url, params))
+                return [{"id": 77, "slug": "cartelera"}]
+
+            def get_response(self, url, *, params, verify):
+                self.calls.append((url, params))
+                return Response()
+
+        source = SourceConfig.from_dict({
+            "name": "Teatro Biobío",
+            "url": "https://teatrobiobio.cl/categoria/cartelera/",
+            "connector": "teatro_biobio",
+            "region": "Región del Biobío",
+            "commune": "Concepción",
+            "venue": "Teatro Biobío",
+            "default_categories": ["Artes escénicas"],
+        })
+        http = Http()
+        events = TeatroBiobioConnector(http).collect(source)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].start_date, "2099-09-28T19:30:00")
+        self.assertEqual(events[0].categories, ["Teatro"])
+        self.assertEqual(events[0].venue, "Teatro Biobío")
+        self.assertEqual(http.calls[1][1]["categories"], 77)
 
 
 class EventOnTests(unittest.TestCase):

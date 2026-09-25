@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from eventos.analytics import RunReporter, load_reconcilable_sources
 from eventos.availability import EventAvailabilityValidator
-from eventos.config import SourceRepository
+from eventos.config import Settings, SourceRepository
 from eventos.consolidation import deduplicate_resolved
 from eventos.exporters import DatasetExporter, load_json_dataset
 from eventos.paths import ROOT
@@ -82,6 +82,7 @@ def main() -> None:
                 sources = SourceRepository().load()
                 EventAvailabilityValidator().apply(events, sources)
                 reconcile_sources = load_reconcilable_sources()
+                reconcile_sources.update(Settings.load().retired_source_names)
             remote = SupabaseExporter.from_env()
             if args.enrich_existing:
                 state = StateStore()

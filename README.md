@@ -13,7 +13,7 @@ El recolector tiene **21 fuentes permanentes y una fuente estacional de septiemb
 | Espacio Cultural Viña del Mar | Valparaíso | The Events Calendar API |
 | Teatro Municipal de Viña del Mar | Valparaíso | JSON-LD |
 | Agenda Cultural UOH | O'Higgins | WordPress REST declarativo |
-| Rancagua Cultura | O'Higgins | JSON-LD |
+| Teatro Biobío | Biobío | WordPress REST + fechas visibles |
 | Agenda Universidad de Talca | Maule | Tarjetas HTML declarativas |
 | Corporación Cultural de Iquique | Tarapacá | Tarjetas institucionales declarativas |
 | Centro de Arte Molino Machmar | Los Lagos | Tarjetas institucionales declarativas |
@@ -98,6 +98,8 @@ encuentra en [`docs/DATABASE.md`](docs/DATABASE.md).
 
 El inventario y la justificación de las agendas consultadas están documentados en
 [`docs/SOURCES.md`](docs/SOURCES.md).
+Las reglas comunes de formato para documentos y diagramas están en
+[`docs/ESTANDAR_DOCUMENTACION.md`](docs/ESTANDAR_DOCUMENTACION.md).
 
 Para crear o actualizar las tablas desde Windows, ejecuta `migrar_supabase.bat`. El identificador
 del proyecto se obtiene automáticamente desde `SUPABASE_URL` en `.env`.
@@ -138,7 +140,7 @@ Se aplican Strategy para los conectores, Registry/Factory para seleccionarlos de
 
 ## NVIDIA NIM
 
-La IA no se usa cuando la fuente ofrece API, microdatos, tarjetas configuradas o JSON-LD. Por eso GAM, Rancagua Cultura y Teatro Municipal de Viña se procesan sin consumir NVIDIA. NIM queda como respaldo de las fuentes genéricas que no publican una estructura estándar. Para utilizarlo, copia `.env.example` como `.env` e incorpora tu clave.
+La IA no se usa cuando la fuente ofrece API, microdatos, tarjetas configuradas o JSON-LD. Por eso GAM, Teatro Biobío y Teatro Municipal de Viña se procesan sin consumir NVIDIA. NIM queda como respaldo de las fuentes genéricas que no publican una estructura estándar. Para utilizarlo, copia `.env.example` como `.env` e incorpora tu clave.
 
 El modelo predeterminado es `meta/llama-3.2-11b-vision-instruct`, verificado con la cuenta tanto para texto como para afiches. La solicitud exige un objeto JSON, desactiva el razonamiento interno para que no consuma el límite antes de entregar los eventos y valida la respuesta antes de importarla. `NVIDIA_MAX_TOKENS` y `NVIDIA_INPUT_CHARS` permiten ajustar los límites. Si NVIDIA responde `401`, `403`, `404` o `410`, revisa que el modelo continúe habilitado para la cuenta. El programa desactiva el respaldo IA después de un error permanente para no repetir llamadas fallidas; las fuentes deterministas continúan normalmente.
 

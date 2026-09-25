@@ -11,6 +11,7 @@ from . import (  # noqa: F401,E402
     html_cards,
     json_api,
     maipu,
+    teatro_biobio,
     ticketplus,
     tribe,
     wordpress,

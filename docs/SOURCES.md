@@ -1,6 +1,6 @@
 # Fuentes de datos del agregador de eventos culturales
 
-**Actualización:** 21 de septiembre de 2026  
+**Actualización:** 25 de septiembre de 2026
 **Cobertura:** las 16 regiones de Chile mediante Chile Cultura, complementadas por agendas
 municipales, culturales, universitarias, vinícolas y de exposiciones.
 
@@ -22,7 +22,7 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
 | [Espacio Cultural Viña del Mar](https://www.culturaviva.cl/actividades/) | Agenda cultural de Viña del Mar | API The Events Calendar |
 | [Teatro Municipal de Viña del Mar](https://teatrovina.cl/cartelera/) | Artes escénicas y espectáculos | JSON-LD |
 | [Agenda Cultural UOH](https://www.uoh.cl/extension/agenda/) | Universidad de O'Higgins | WordPress REST; fechas propias y resumen Yoast saneado |
-| [Rancagua Cultura](https://rancaguacultura.cl/event-directory/) | Cartelera cultural de Rancagua | JSON-LD |
+| [Teatro Biobío](https://teatrobiobio.cl/categoria/cartelera/) | Teatro, música, danza y circo en Concepción | WordPress REST; fechas visibles interpretadas de forma determinista |
 | [Agenda Universidad de Talca](https://agenda.utalca.cl/) | Actividades universitarias y culturales | Tarjetas HTML declarativas |
 | [Enoturismo Chile · Agenda](https://www.enoturismochile.cl/agenda/) | Vendimias y enoturismo | WordPress/EventON |
 | [FISA · Ferias y Exposiciones](https://www.fisa.cl/nuestras-ferias/) | Ferias y exposiciones sectoriales | Portafolio público de eventos |
@@ -53,3 +53,7 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
   plantilla y no se ejecuta.
 
 La configuración vigente contiene **21 fuentes permanentes y 1 fuente estacional de septiembre**. Todas están habilitadas; la fuente de FondasChile se ejecuta únicamente durante septiembre. Una configuración sin eventos vigentes no aparece en el conteo visible de la aplicación.
+
+## Fuente retirada
+
+Rancagua Cultura se retiró el 25 de septiembre de 2026 porque la cartelera devolvió HTTP 403 desde GitHub Actions. `settings.json` conserva su nombre en `retired_source_names`: en la siguiente sincronización exitosa, Supabase retirará únicamente los eventos que todavía pertenezcan a esa fuente. No se elimina información de ninguna otra fuente.

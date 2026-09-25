@@ -78,6 +78,7 @@ class Settings:
     include_unknown_region: bool = False
     cultural_filter_enabled: bool = True
     cultural_review_action: str = "keep"
+    retired_source_names: tuple[str, ...] = ()
 
     @classmethod
     def load(cls, path: Path = SETTINGS_FILE) -> "Settings":
@@ -87,6 +88,9 @@ class Settings:
             include_unknown_region=bool(payload.get("include_unknown_region", False)),
             cultural_filter_enabled=bool(payload.get("cultural_filter_enabled", True)),
             cultural_review_action=str(payload.get("cultural_review_action", "keep")),
+            retired_source_names=tuple(
+                str(name) for name in payload.get("retired_source_names", []) if str(name).strip()
+            ),
         )
 
 

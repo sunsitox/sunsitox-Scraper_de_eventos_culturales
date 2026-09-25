@@ -1,0 +1,24 @@
+{
+  "name": "Teatro Biobío",
+  "url": "https://teatrobiobio.cl/categoria/cartelera/",
+  "connector": "teatro_biobio",
+  "api_url": "https://teatrobiobio.cl/wp-json/wp/v2/posts",
+  "categories_api_url": "https://teatrobiobio.cl/wp-json/wp/v2/categories",
+  "category_slug": "cartelera",
+  "region": "Región del Biobío",
+  "commune": "Concepción",
+  "city": "Concepción",
+  "organizer": "Fundación Teatro Biobío",
+  "venue": "Teatro Biobío",
+  "address": "Avenida Cardenal Raúl Silva Henríquez 477, Concepción",
+  "default_categories": [
+    "Artes escénicas"
+  ],
+  "max_pages": 5,
+  "max_results": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_note": "Cartelera oficial de Concepción obtenida desde WordPress REST; las fechas visibles se interpretan sin OCR ni NVIDIA."
+}

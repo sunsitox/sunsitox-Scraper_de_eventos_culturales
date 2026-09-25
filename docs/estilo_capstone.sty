@@ -1,0 +1,37 @@
+% Plantilla visual comun para la documentacion del proyecto Capstone.
+% Usar con: \usepackage{estilo_capstone}
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{estilo_capstone}[2026/09/25 Estilo documental Capstone]
+
+\RequirePackage{lmodern}
+\RequirePackage[margin=2.5cm]{geometry}
+\RequirePackage{xcolor}
+\RequirePackage{microtype}
+\RequirePackage{setspace}
+\RequirePackage{enumitem}
+\RequirePackage{hyperref}
+\RequirePackage{fancyhdr}
+\RequirePackage{booktabs}
+\RequirePackage{longtable}
+\RequirePackage{array}
+
+\definecolor{azul}{HTML}{17365D}
+\definecolor{celeste}{HTML}{EAF2F8}
+\definecolor{gris}{HTML}{4A5568}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=azul,
+  urlcolor=azul,
+  citecolor=azul,
+  pdfborder={0 0 0}
+}
+
+\setstretch{1.15}
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\setlength{\headheight}{14pt}
+\setlist{noitemsep,topsep=3pt,leftmargin=*}
+\pagestyle{fancy}
+\fancyhf{}
+\cfoot{\thepage}

@@ -46,6 +46,12 @@ class ConfigurationTests(unittest.TestCase):
         enabled = {source.name for source in SourceRepository().load() if source.enabled}
         self.assertIn("Centro Cultural CEINA", enabled)
 
+    def test_teatro_biobio_replaces_rancagua_as_an_active_source(self):
+        enabled = {source.name for source in SourceRepository().load() if source.enabled}
+        self.assertIn("Teatro Biobío", enabled)
+        self.assertNotIn("Rancagua Cultura", enabled)
+        self.assertIn("Rancagua Cultura", Settings.load().retired_source_names)
+
     def test_source_keeps_connector_specific_options(self):
         source = SourceConfig.from_dict(
             {"name": "Ejemplo", "url": "https://example.cl", "field_map": {"title": "name"}}

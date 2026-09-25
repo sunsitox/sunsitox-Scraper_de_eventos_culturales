@@ -4,30 +4,14 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish,es-nodecimaldot]{babel}
-\usepackage{lmodern}
-\usepackage[margin=2.4cm]{geometry}
-\usepackage{xcolor}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{array}
-\usepackage{enumitem}
-\usepackage{hyperref}
+\usepackage{estilo_capstone}
 \usepackage{graphicx}
-\usepackage{fancyhdr}
 \usepackage{listings}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric}
 
-\definecolor{azul}{HTML}{17365D}
-\definecolor{celeste}{HTML}{EAF2F8}
-\definecolor{gris}{HTML}{4A5568}
 \hypersetup{colorlinks=true,linkcolor=azul,urlcolor=azul,citecolor=azul,pdftitle={Documentaci\'{o}n t\'{e}cnica del scraper de eventos culturales}}
-\setlist{noitemsep,topsep=3pt}
-\setlength{\parskip}{5pt}
-\setlength{\parindent}{0pt}
-\pagestyle{fancy}
 \fancyhf{}
-\setlength{\headheight}{14pt}
 \lhead{Scraper de eventos culturales de Chile}
 \rhead{Documentaci\'{o}n t\'{e}cnica}
 \cfoot{\thepage}
@@ -178,7 +162,7 @@ Valpo Cultura & Valpara\'{i}so & The Events Calendar API \\
 Espacio Cultural Vi\~{n}a del Mar & Valpara\'{i}so & The Events Calendar API \\
 Teatro Municipal de Vi\~{n}a del Mar & Valpara\'{i}so & JSON-LD \\
 Agenda Cultural UOH & O'Higgins & WordPress REST \\
-Rancagua Cultura & O'Higgins & JSON-LD \\
+Teatro Biob\'{i}o & Biob\'{i}o & WordPress REST y fechas visibles \\
 Agenda Universidad de Talca & Maule & Tarjetas HTML declarativas \\
 Corporaci\'{o}n Cultural de Iquique & Tarapac\'{a} & Tarjetas institucionales \\
 Centro de Arte Molino Machmar & Los Lagos & Tarjetas institucionales \\
@@ -196,6 +180,8 @@ FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
 \normalsize
 
 Cada archivo en \texttt{sources/} declara URL, regi\'{o}n, comuna, organizador, conector, categor\'{i}as por defecto, l\'{i}mites de paginaci\'{o}n y, cuando corresponda, metadatos est\'{a}ticos de ubicaci\'{o}n. A\~{n}adir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea c\'{o}digo nuevo cuando la estructura no coincide con ninguno.
+
+Las fuentes retiradas se declaran en \texttt{settings.json} mediante \texttt{retired\_source\_names}. Durante la siguiente publicaci\'{o}n se reconcilian de forma intencional para eliminar solamente sus eventos remotos. Esto evita que una fuente eliminada de \texttt{sources/} deje registros hu\'{e}rfanos en Supabase.
 
 \section{Flujo de procesamiento}
 
@@ -381,6 +367,7 @@ Las claves secretas de Supabase se usan solamente por el scraper o GitHub Action
   \item \texttt{docs/RESUMABLE\_PIPELINE.md}: checkpoints, cola de IA y recuperaci\'{o}n.
   \item \texttt{docs/SUPABASE.md}: migraciones, seguridad y operaci\'{o}n de la sincronizaci\'{o}n.
   \item \texttt{docs/DEFINICION\_Y\_FILTRO\_CULTURAL.md}: criterio de inclusi\'{o}n cultural.
+  \item \texttt{docs/ESTANDAR\_DOCUMENTACION.md}: formato com\'{u}n para documentos y diagramas del proyecto.
 \end{itemize}
 
 \vfill

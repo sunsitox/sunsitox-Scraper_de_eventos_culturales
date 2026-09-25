@@ -309,6 +309,10 @@ class EventPipeline:
                 for summary in source_summaries
                 if summary.status in {"succeeded", "complete_empty"}
             }
+            # Una fuente retirada se reconcilia intencionalmente aunque ya no
+            # tenga JSON activo: sus registros no deben sobrevivir al cambio
+            # de proveedor por simple ausencia en la corrida actual.
+            reconcile_sources.update(settings.retired_source_names)
             remote.export(events, reconcile_sources=reconcile_sources)
         self.state.put("pipeline", "published", {"cycle": self.cycle, "events": event_rows(events)})
         if all(

@@ -183,6 +183,10 @@ Cada archivo en \texttt{sources/} declara URL, regi\'{o}n, comuna, organizador, 
 
 Las fuentes retiradas se declaran en \texttt{settings.json} mediante \texttt{retired\_source\_names}. Durante la siguiente publicaci\'{o}n se reconcilian de forma intencional para eliminar solamente sus eventos remotos. Esto evita que una fuente eliminada de \texttt{sources/} deje registros hu\'{e}rfanos en Supabase.
 
+\subsection{Validaci\'{o}n de candidatas}
+
+Antes de integrar una fuente, el comando \texttt{validar\_fuentes.bat} revisa el inventario de candidatas sin extraer eventos ni modificar Supabase. Comprueba disponibilidad HTTP, \texttt{robots.txt}, presencia de se\~{n}ales de agenda, fechas, enlaces, pertinencia cultural y cobertura chilena. Sus resultados se guardan en \texttt{data/source\_validation/}; una aprobaci\'{o}n t\'{e}cnica no habilita una fuente autom\'{a}ticamente, pues la configuraci\'{o}n y las pruebas siguen siendo una decisi\'{o}n del equipo.
+
 \section{Flujo de procesamiento}
 
 \subsection{Fase de extracci\'{o}n}
@@ -362,12 +366,11 @@ Las claves secretas de Supabase se usan solamente por el scraper o GitHub Action
 
 \begin{itemize}
   \item \texttt{README.md}: instalaci\'{o}n, comandos cotidianos y visi\'{o}n r\'{a}pida.
-  \item \texttt{docs/ARCHITECTURE.md}: detalle de componentes y patrones.
   \item \texttt{docs/SOURCES.md}: procedencia y tratamiento de cada fuente.
-  \item \texttt{docs/RESUMABLE\_PIPELINE.md}: checkpoints, cola de IA y recuperaci\'{o}n.
-  \item \texttt{docs/SUPABASE.md}: migraciones, seguridad y operaci\'{o}n de la sincronizaci\'{o}n.
-  \item \texttt{docs/DEFINICION\_Y\_FILTRO\_CULTURAL.md}: criterio de inclusi\'{o}n cultural.
+  \item \texttt{docs/DATABASE.md}: diccionario de la base de datos, mantenido por separado.
+  \item \texttt{sources/GUIA\_AGREGAR\_Y\_MANTENER\_FUENTES.md}: operaci\'{o}n detallada de fuentes.
   \item \texttt{docs/ESTANDAR\_DOCUMENTACION.md}: formato com\'{u}n para documentos y diagramas del proyecto.
+  \item \texttt{docs/historico/}: auditor\'{i}as y validaciones fechadas como evidencia.
 \end{itemize}
 
 \vfill

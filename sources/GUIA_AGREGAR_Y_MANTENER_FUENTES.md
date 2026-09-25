@@ -14,8 +14,8 @@ Comprueba que:
 - permita obtener como mínimo título, fecha y una URL de referencia;
 - sus términos de uso y `robots.txt` no prohíban la consulta automatizada;
 - la frecuencia de ejecución sea razonable para el sitio;
-- los eventos puedan cumplir la definición del catálogo descrita en
-  [`../docs/DEFINICION_Y_FILTRO_CULTURAL.md`](../docs/DEFINICION_Y_FILTRO_CULTURAL.md).
+- los eventos puedan cumplir la definición del catálogo descrita en la
+  [`documentación técnica del scraper`](../docs/DOCUMENTACION_SCRAPER.pdf).
 
 Una fuente puede contener eventos comerciales o industriales. El filtro global
 evaluará cada ficha antes de exportarla o enviarla a Supabase; las palabras
@@ -114,8 +114,8 @@ Campos comunes:
 Los checkpoints y pendientes de IA se guardan en `state/pipeline.sqlite3`. Cambiar el JSON
 invalida la caché de detalles y el checkpoint de esa fuente. Un conector que obtenga solo
 parte de las fichas debe establecer `collection_complete = False`: así se conservan sus
-resultados válidos sin autorizar eliminaciones por ausencia en Supabase. Consulta
-[la guía del pipeline reanudable](../docs/RESUMABLE_PIPELINE.md) antes de activar caché
+resultados válidos sin autorizar eliminaciones por ausencia en Supabase. Consulta la
+[documentación técnica del scraper](../docs/DOCUMENTACION_SCRAPER.pdf) antes de activar caché
 en una fuente nueva: el TTL determina cuánto puede demorarse la detección de cambios.
 
 No coloques claves, tokens, contraseñas ni encabezados privados en estos JSON.

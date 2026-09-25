@@ -43,8 +43,9 @@ python scrape_events.py --phase extract --local-only
 python scrape_events.py --phase process --supabase
 ```
 
-El workflow restaura y conserva este estado mediante artefactos. Consulta
-[checkpoints, cola de IA y límites de recuperación](docs/RESUMABLE_PIPELINE.md).
+El workflow restaura y conserva este estado mediante artefactos. El detalle de checkpoints,
+cola de IA, límites y recuperación está consolidado en la
+[documentación técnica del scraper](docs/DOCUMENTACION_SCRAPER.pdf).
 
 ## Instalación
 
@@ -92,8 +93,8 @@ incluye extracción, normalización, exportación local y, si corresponde, sincr
 Supabase. La última medición también queda en `data/run_summary.json`.
 
 Opcionalmente, el mismo resultado puede sincronizarse directamente con Supabase mediante una
-carga idempotente. El esquema, la migración, las variables y GitHub Actions se explican en
-[`docs/SUPABASE.md`](docs/SUPABASE.md). El diccionario completo de tablas, columnas y categorías se
+carga idempotente. El esquema, la migración, las variables y GitHub Actions se explican en la
+[documentación técnica del scraper](docs/DOCUMENTACION_SCRAPER.pdf). El diccionario completo de tablas, columnas y categorías se
 encuentra en [`docs/DATABASE.md`](docs/DATABASE.md).
 
 El inventario y la justificación de las agendas consultadas están documentados en
@@ -136,7 +137,7 @@ La configuración predeterminada recorre todas las páginas. Hasta cuatro domini
 
 La raíz conserva solamente los comandos cotidianos. La documentación vive en `docs/`, las utilidades de mantenimiento en `tools/`, las fuentes declarativas en `sources/`, las migraciones en `supabase/` y las pruebas en `tests/`.
 
-Se aplican Strategy para los conectores, Registry/Factory para seleccionarlos desde los JSON, Repository para cargar fuentes e inyección de dependencias para probar el pipeline. La explicación completa está en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Se aplican Strategy para los conectores, Registry/Factory para seleccionarlos desde los JSON, Repository para cargar fuentes e inyección de dependencias para probar el pipeline. La explicación completa está en la [documentación técnica del scraper](docs/DOCUMENTACION_SCRAPER.pdf).
 
 ## NVIDIA NIM
 
@@ -191,7 +192,7 @@ y coordenadas verificadas; también puede activarse cuando el nombre aparece en 
 
 El organizador se conserva en cada evento y se normaliza en `organizers`. Marcar
 `organizers.is_blocked=true` oculta de inmediato todos sus eventos mediante RLS y evita que futuras
-corridas gasten OCR o redacción en ellos. El procedimiento está en [`docs/SUPABASE.md`](docs/SUPABASE.md).
+corridas gasten OCR o redacción en ellos. El procedimiento está en la [documentación técnica del scraper](docs/DOCUMENTACION_SCRAPER.pdf).
 
 Una fuente que siempre usa el mismo recinto puede declararlo sin modificar Python:
 
@@ -226,7 +227,7 @@ El asistente permite elegir el tipo de fuente y solicita solamente las rutas o s
 
 El conector `generic` intenta primero extraer JSON-LD/Schema.org y, si no encuentra eventos estructurados y existe una clave NVIDIA, usa NIM como respaldo. `json_api` permite incorporar una API paginada configurando `results_path`, parámetros de paginación y `field_map`, sin crear una clase Python. También existen `html_cards`, `tribe_events_api`, `wordpress_rest`, `eventon_wordpress`, `fisa_portfolio`, `chilecultura_api` y `maipu_browser`.
 
-Para una API WordPress, `wordpress_rest` permite mapear campos desde el propio JSON de la fuente, sin editar Python. Consulta [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para ver un ejemplo.
+Para una API WordPress, `wordpress_rest` permite mapear campos desde el propio JSON de la fuente, sin editar Python. Consulta la [documentación técnica del scraper](docs/DOCUMENTACION_SCRAPER.pdf) para ver la arquitectura y los ejemplos.
 
 `html_cards` permite hacer lo mismo con páginas HTML estáticas: `card_selector` identifica cada tarjeta y `selectors` mapea título, fechas, lugar, imagen y enlace mediante CSS.
 
@@ -278,8 +279,8 @@ validar_fuentes.bat
 ```
 
 La auditoría completa, el catálogo aprobado y la cola de revisión se generan en
-`data/source_validation/`. Las reglas y parámetros están documentados en
-[`docs/SOURCE_VALIDATION.md`](docs/SOURCE_VALIDATION.md).
+`data/source_validation/`. Las reglas y parámetros están resumidos en la
+[documentación técnica del scraper](docs/DOCUMENTACION_SCRAPER.pdf).
 
 ## Consideraciones
 

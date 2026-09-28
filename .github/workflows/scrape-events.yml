@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # Madrugada de Chile: deja margen para una corrida extensa y evita el minuto 00.
-    - cron: "15 0 * * *"
+    - cron: "37 0 * * *"
       timezone: "America/Santiago"
 
 permissions:

@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 from eventos.config import SourceConfig
 from eventos.connectors.eventon import event_from_microdata
@@ -290,7 +291,11 @@ class HtmlCardsTests(unittest.TestCase):
         )
         http = Mock()
         http.get_html.return_value = html
-        with patch("eventos.connectors.html_cards.chile_now", return_value=datetime(2026, 9, 21)):
+        fixed_now = datetime(2026, 9, 21, 12, tzinfo=ZoneInfo("America/Santiago"))
+        with (
+            patch("eventos.connectors.html_cards.chile_now", return_value=fixed_now),
+            patch("eventos.text.chile_now", return_value=fixed_now),
+        ):
             events = HtmlCardsConnector(http).collect(source)
         self.assertEqual(len(events), 1)
         event = events[0]

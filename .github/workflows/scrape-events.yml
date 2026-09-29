@@ -3,8 +3,8 @@ name: Extraer eventos y sincronizar Supabase
 on:
   workflow_dispatch:
   schedule:
-    # Madrugada de Chile: deja margen para una corrida extensa y evita el minuto 00.
-    - cron: "37 0 * * *"
+    # Noche de Chile: margen suficiente ante demoras del programador y sin usar minuto 00.
+    - cron: "37 23 * * *"
       timezone: "America/Santiago"
 
 permissions:

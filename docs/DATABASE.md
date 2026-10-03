@@ -142,8 +142,10 @@ flowchart LR
     linkStyle default stroke:#6f838c,stroke-width:1.7px
 ```
 
-Esta vista prioriza la lectura arquitectónica. Las cardinalidades formales se conservan en el
-archivo técnico `modelo_er.mmd`, que funciona como referencia relacional versionada.
+Esta vista prioriza la lectura arquitectónica. Las entidades, columnas, claves y cardinalidades
+formales se conservan en `modelo_er.mmd`. Ese archivo se genera desde la fuente canónica
+`evento_cultural_modelo.dbml` mediante `python tools/generate_model_er.py`; no debe editarse
+manualmente. La opción `--check` permite detectar divergencias antes de publicar documentación.
 
 `scrape_runs` registra la salud de cada sincronización y no necesita una clave foránea hacia
 los eventos. Una ejecución puede descubrir cientos de eventos, pero los eventos permanecen

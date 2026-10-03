@@ -61,6 +61,21 @@ def extract_control_fields(text: str) -> dict[str, str]:
     return fields
 
 
+def extract_migration_ids(text: str) -> list[str]:
+    """Return the ordered migration identifiers declared by DATABASE.md."""
+    match = re.search(
+        r"### Migraciones de referencia\s*(.*?)(?=\n### |\n## |\Z)",
+        text,
+        flags=re.DOTALL,
+    )
+    if match is None:
+        return []
+    return re.findall(
+        r"supabase/migrations/(\d{14})_[^`\s]+\.sql",
+        match.group(1),
+    )
+
+
 def validate_source_contract(text: str, fields: dict[str, str]) -> None:
     required_fields = {
         "Tipo de documento",
@@ -80,6 +95,12 @@ def validate_source_contract(text: str, fields: dict[str, str]) -> None:
         raise ValueError(
             "DATABASE.md no define los campos de control requeridos: "
             + ", ".join(missing)
+        )
+
+    if not extract_migration_ids(text):
+        raise ValueError(
+            "DATABASE.md no declara migraciones bajo "
+            "'### Migraciones de referencia'."
         )
 
     match = re.search(r"```mermaid\s*\n(.*?)\n```", text, flags=re.DOTALL)
@@ -393,7 +414,11 @@ def configure_section(doc: Document, fields: dict[str, str]) -> None:
     add_field(p, "PAGE")
 
 
-def add_cover(doc: Document, fields: dict[str, str]) -> None:
+def add_cover(
+    doc: Document,
+    fields: dict[str, str],
+    migration_ids: list[str],
+) -> None:
     for _ in range(4):
         doc.add_paragraph()
     kicker = doc.add_paragraph()
@@ -436,6 +461,11 @@ def add_cover(doc: Document, fields: dict[str, str]) -> None:
     set_run_font(run, size=10.5, color=MUTED)
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    meta.paragraph_format.space_after = Pt(5)
+    run = meta.add_run("Migraciones: " + " · ".join(migration_ids))
+    set_run_font(run, size=9.2, color=MUTED)
+    meta = doc.add_paragraph()
+    meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = meta.add_run(fields.get("Uso", "Documento de uso personal"))
     set_run_font(run, size=10.5, color=MUTED, italic=True)
     doc.add_page_break()
@@ -447,6 +477,7 @@ def add_contents(doc: Document, headings: list[str], fields: dict[str, str]) -> 
         numbered = re.match(r"^(\d+)\.\s*(.+)$", heading)
         number = int(numbered.group(1)) if numbered else index
         heading = numbered.group(2) if numbered else heading
+        heading = strip_inline_markdown(heading)
         p = doc.add_paragraph()
         p.paragraph_format.left_indent = Inches(0.15)
         p.paragraph_format.space_after = Pt(5)
@@ -500,6 +531,10 @@ def add_table(doc: Document, rows: list[list[str]]) -> None:
             for run in paragraph.runs:
                 if row_index == 0:
                     run.bold = True
+    # Do not leave a table header isolated at the foot of a page.
+    for cell in table.rows[0].cells:
+        for paragraph in cell.paragraphs:
+            paragraph.paragraph_format.keep_with_next = True
     spacer = doc.add_paragraph()
     spacer.paragraph_format.space_after = Pt(2)
 
@@ -520,6 +555,42 @@ def add_code_block(doc: Document, lines: list[str]) -> None:
             paragraph.add_run().add_break()
         run = paragraph.add_run(line)
         set_run_font(run, name="Consolas", size=8.5, color=NAVY)
+
+
+def add_callout(doc: Document, text: str) -> None:
+    """Render a Markdown blockquote as a single, readable callout."""
+    table = doc.add_table(rows=1, cols=1)
+    set_table_geometry(table, [9360])
+    set_table_borders(table)
+    cell = table.cell(0, 0)
+    set_cell_shading(cell, "EEF4F8")
+    paragraph = cell.paragraphs[0]
+    paragraph.paragraph_format.space_before = Pt(2)
+    paragraph.paragraph_format.space_after = Pt(2)
+    paragraph.paragraph_format.line_spacing = 1.15
+    add_inline(paragraph, text, size=9.5, color=NAVY)
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(2)
+
+
+def starts_markdown_block(value: str) -> bool:
+    stripped = value.strip()
+    return bool(
+        not stripped
+        or stripped.startswith(("```", "## ", "### ", "#### ", "| ", ">"))
+        or re.match(r"^- ", stripped)
+        or re.match(r"^\d+\. ", stripped)
+    )
+
+
+def collect_wrapped_lines(lines: list[str], index: int) -> tuple[str, int]:
+    """Join soft-wrapped Markdown lines into one semantic paragraph or list item."""
+    fragments = [lines[index].strip()]
+    index += 1
+    while index < len(lines) and not starts_markdown_block(lines[index]):
+        fragments.append(lines[index].strip())
+        index += 1
+    return " ".join(fragment for fragment in fragments if fragment), index
 
 
 def add_relationship_figure(doc: Document, fields: dict[str, str]) -> None:
@@ -549,6 +620,7 @@ def build_document() -> None:
     source_lines = text.splitlines()
     level_two_headings = [line[3:].strip() for line in source_lines if line.startswith("## ")]
     control_fields = extract_control_fields(text)
+    migration_ids = extract_migration_ids(text)
     validate_source_contract(text, control_fields)
 
     doc = Document()
@@ -562,7 +634,7 @@ def build_document() -> None:
 
     bullet_num_id = add_numbering_definition(doc, "bullet")
     decimal_num_id = add_numbering_definition(doc, "decimal")
-    add_cover(doc, control_fields)
+    add_cover(doc, control_fields, migration_ids)
     add_contents(doc, level_two_headings, control_fields)
 
     lines = source_lines[1:]
@@ -586,11 +658,11 @@ def build_document() -> None:
             continue
 
         if stripped.startswith("## "):
-            doc.add_heading(stripped[3:], level=1)
+            doc.add_heading(strip_inline_markdown(stripped[3:]), level=1)
         elif stripped.startswith("### "):
-            doc.add_heading(stripped[4:], level=2)
+            doc.add_heading(strip_inline_markdown(stripped[4:]), level=2)
         elif stripped.startswith("#### "):
-            doc.add_heading(stripped[5:], level=3)
+            doc.add_heading(strip_inline_markdown(stripped[5:]), level=3)
         elif stripped.startswith("| "):
             table_lines = []
             while index < len(lines) and lines[index].strip().startswith("|"):
@@ -599,19 +671,29 @@ def build_document() -> None:
             add_table(doc, parse_markdown_table(table_lines))
             continue
         elif re.match(r"^- ", stripped):
+            item, index = collect_wrapped_lines(lines, index)
             paragraph = doc.add_paragraph()
             apply_numbering(paragraph, bullet_num_id)
-            add_inline(paragraph, stripped[2:])
+            add_inline(paragraph, item[2:])
+            continue
         elif re.match(r"^\d+\. ", stripped):
+            item, index = collect_wrapped_lines(lines, index)
             paragraph = doc.add_paragraph()
             apply_numbering(paragraph, decimal_num_id)
-            add_inline(paragraph, re.sub(r"^\d+\. ", "", stripped))
+            add_inline(paragraph, re.sub(r"^\d+\. ", "", item))
+            continue
         elif stripped.startswith(">"):
-            paragraph = doc.add_paragraph()
-            add_inline(paragraph, stripped.lstrip("> "))
+            quote_lines = []
+            while index < len(lines) and lines[index].strip().startswith(">"):
+                quote_lines.append(lines[index].strip().lstrip("> "))
+                index += 1
+            add_callout(doc, " ".join(quote_lines))
+            continue
         elif stripped:
+            paragraph_text, index = collect_wrapped_lines(lines, index)
             paragraph = doc.add_paragraph()
-            add_inline(paragraph, stripped)
+            add_inline(paragraph, paragraph_text)
+            continue
         index += 1
 
     doc.save(OUTPUT)

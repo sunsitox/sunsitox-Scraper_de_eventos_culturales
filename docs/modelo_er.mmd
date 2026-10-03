@@ -1,3 +1,6 @@
+%% AUTO-GENERATED FILE. DO NOT EDIT BY HAND.
+%% Source: docs/evento_cultural_modelo.dbml
+%% Regenerate: python tools/generate_model_er.py
 %%{init: {
   "theme": "base",
   "themeVariables": {
@@ -14,7 +17,7 @@
   "er": {
     "diagramPadding": 24,
     "layoutDirection": "TB",
-    "minEntityWidth": 130,
+    "minEntityWidth": 150,
     "minEntityHeight": 42,
     "entityPadding": 12,
     "stroke": "#7f9aa5",
@@ -22,17 +25,165 @@
   }
 }}%%
 erDiagram
-    SOURCES ||--o{ EVENTS : publica
-    ORGANIZERS |o--o{ EVENTS : organiza
-    COMMUNES |o--o{ EVENTS : localiza
-    EVENTS ||--o{ EVENT_CATEGORIES : clasifica
-    CATEGORIES ||--o{ EVENT_CATEGORIES : agrupa
-    EVENTS ||--o{ MEDIA_ASSETS : contiene
-    EVENTS ||--o| EVENT_PROVENANCE : conserva_evidencia
-    AUTH_USERS ||--|| PROFILES : posee
-    AUTH_USERS ||--o{ USER_EVENT_INTERACTIONS : registra
-    EVENTS ||--o{ USER_EVENT_INTERACTIONS : recibe
-    AUTH_USERS ||--o{ REPORTS : crea
-    EVENTS ||--o{ REPORTS : recibe
-    SCRAPE_RUNS ||--o{ CATALOG_STAGING : agrupa_logicamente
+    sources ||--o{ events : "source_id"
+    organizers |o--o{ events : "organizer_id"
+    communes |o--o{ events : "commune_id"
+    events ||--|| event_provenance : "event_id"
+    events ||--o{ event_categories : "event_id"
+    categories ||--o{ event_categories : "category_id"
+    events ||--o{ media_assets : "event_id"
+    auth_users ||--|| profiles : "id"
+    auth_users ||--o{ user_event_interactions : "user_id"
+    events ||--o{ user_event_interactions : "event_id"
+    auth_users ||--o{ reports : "user_id"
+    events ||--o{ reports : "event_id"
 
+    sources {
+        uuid id PK
+        text name "not null"
+        text website_url
+        boolean is_active "not null"
+        timestamptz last_seen_at
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    organizers {
+        uuid id PK
+        text name "not null"
+        text entity_type
+        timestamptz last_seen_at
+        boolean is_blocked "Control administrativo privado; not null"
+        text blocked_reason
+        timestamptz blocked_at
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    communes {
+        uuid id PK
+        text name "not null"
+        text region
+        text country "not null"
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    categories {
+        uuid id PK
+        text name "not null"
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    scrape_runs {
+        uuid id PK
+        timestamptz started_at "not null"
+        timestamptz finished_at
+        text status "running | succeeded | failed; not null"
+        integer events_count "not null"
+        text error_message
+        jsonb metadata "not null"
+    }
+
+    events {
+        uuid id PK
+        text external_key UK "not null"
+        uuid source_id FK "not null"
+        uuid organizer_id FK
+        uuid commune_id FK
+        text title "not null"
+        timestamptz start_at
+        timestamptz end_at
+        text venue
+        text address
+        text city
+        text region
+        text country "not null"
+        text postal_code
+        double latitude "PostgreSQL double precision; entre -90 y 90"
+        double longitude "PostgreSQL double precision; entre -180 y 180"
+        text location "not null"
+        text location_precision "exact | coordinates | venue | commune | city | region | online | country; not null"
+        text location_source "source-data | source-default | deterministic-inference | nvidia-nim | geographic-fallback; not null"
+        text status "published | cancelled | draft | archived; not null"
+        boolean is_suppressed "Exclusión administrativa persistente; not null"
+        text suppression_reason
+        timestamptz suppressed_at
+        text audience
+        boolean is_free
+        text description
+        text price_text
+        text currency "not null"
+        text image_url
+        text source_url
+        text official_url
+        text extraction_method
+        timestamptz scraped_at "not null"
+        timestamptz last_seen_at "not null"
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    event_provenance {
+        uuid event_id PK, FK
+        text original_url
+        text source_description
+        text ocr_text
+        boolean is_rewritten "not null"
+        timestamptz updated_at "not null"
+    }
+
+    event_categories {
+        uuid event_id PK, FK
+        uuid category_id PK, FK
+        timestamptz created_at "not null"
+    }
+
+    media_assets {
+        uuid id PK
+        uuid event_id FK "not null"
+        text url "not null"
+        text media_type "image | video | audio | document; not null"
+        boolean is_primary "not null"
+        timestamptz created_at "not null"
+    }
+
+    profiles {
+        uuid id PK, FK
+        text display_name
+        text role "visitor | editor | admin; not null"
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    catalog_staging {
+        uuid run_id PK "not null"
+        text entity PK "sources | organizers | communes | categories | events | event_provenance | event_categories | media_assets; not null"
+        integer chunk_index PK "Mayor o igual que cero; not null"
+        jsonb payload "Arreglo JSON privado; not null"
+        timestamptz created_at "not null"
+    }
+
+    user_event_interactions {
+        uuid id PK
+        uuid user_id FK "not null"
+        uuid event_id FK "not null"
+        text interaction_type "view_detail | open_source | open_official_site | interested | not_interested | share | report; not null"
+        timestamptz occurred_at "not null"
+        jsonb metadata "not null"
+    }
+
+    reports {
+        uuid id PK
+        uuid user_id FK "not null"
+        uuid event_id FK "not null"
+        text reason "not null"
+        text status "pending | reviewed | resolved; not null"
+        timestamptz created_at "not null"
+        timestamptz updated_at "not null"
+    }
+
+    auth_users {
+        uuid id PK "Gestionada por Supabase Auth (auth.users)"
+    }

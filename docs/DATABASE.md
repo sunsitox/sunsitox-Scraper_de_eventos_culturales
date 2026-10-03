@@ -25,32 +25,101 @@ utilizó solamente como referencia relacional; los campos de esta base provienen
 ```mermaid
 %%{init: {
   "theme": "base",
+  "flowchart": {
+    "curve": "basis",
+    "htmlLabels": true,
+    "nodeSpacing": 34,
+    "rankSpacing": 54,
+    "padding": 14
+  },
   "themeVariables": {
     "background": "#ffffff",
-    "primaryColor": "#f7f9fa",
+    "fontFamily": "Arial",
+    "fontSize": "16px",
     "primaryTextColor": "#26343b",
-    "primaryBorderColor": "#7f9aa5",
-    "lineColor": "#506874",
-    "secondaryColor": "#eaf2f3",
-    "tertiaryColor": "#f5ece8",
-    "fontFamily": "Arial"
+    "lineColor": "#6f838c",
+    "clusterBkg": "#ffffff",
+    "clusterBorder": "#c9d5db",
+    "edgeLabelBackground": "#ffffff"
   }
 }}%%
-erDiagram
-    SOURCES ||--o{ EVENTS : publica
-    ORGANIZERS |o--o{ EVENTS : organiza
-    COMMUNES |o--o{ EVENTS : localiza
-    EVENTS ||--o{ EVENT_CATEGORIES : clasifica
-    CATEGORIES ||--o{ EVENT_CATEGORIES : agrupa
-    EVENTS ||--o{ MEDIA_ASSETS : contiene
-    EVENTS ||--o| EVENT_PROVENANCE : conserva_evidencia
-    AUTH_USERS ||--|| PROFILES : posee
-    AUTH_USERS ||--o{ USER_EVENT_INTERACTIONS : registra
-    EVENTS ||--o{ USER_EVENT_INTERACTIONS : recibe
-    AUTH_USERS ||--o{ REPORTS : crea
-    EVENTS ||--o{ REPORTS : recibe
-    SCRAPE_RUNS ||--o{ CATALOG_STAGING : agrupa_logicamente
+flowchart LR
+    subgraph PIPE[" "]
+      direction TB
+      subgraph ING["01  INGESTA Y OPERACIÓN"]
+        direction TB
+        SRC["Fuentes públicas<br/><span>agendas · municipios · ticketera</span>"]
+        RUN["scrape_runs<br/><span>salud y trazabilidad</span>"]
+        STG[("catalog_staging<br/><span>publicación temporal</span>")]
+        SRC -->|extrae| RUN
+        RUN -->|consolida| STG
+      end
+
+      subgraph CAT["02  CATÁLOGO CULTURAL"]
+        direction TB
+        EV[("events<br/><span>registro canónico</span>")]
+        subgraph CONTEXT["CONTEXTO"]
+            direction LR
+            ORG["organizers"]
+            COM["communes"]
+        end
+        subgraph CONTENT["CONTENIDO Y EVIDENCIA"]
+            direction LR
+            TAX["categories"]
+            EC["event_categories"]
+            MED["media_assets"]
+            PROV["event_provenance"]
+        end
+        ORG -->|organiza| EV
+        COM -->|localiza| EV
+        EV -->|clasifica| EC
+        TAX -->|agrupa| EC
+        EV -->|contiene| MED
+        EV -->|conserva evidencia| PROV
+      end
+
+      ING ==>|publicación atómica| CAT
+    end
+
+    subgraph APP["03  APLICACIÓN Y USUARIOS"]
+        direction LR
+        AUTH["Supabase Auth<br/><span>identidad</span>"]
+        PROF["profiles<br/><span>perfil mínimo</span>"]
+        INT["user_event_interactions<br/><span>señales de recomendación</span>"]
+        REP["reports<br/><span>control ciudadano</span>"]
+        AUTH -->|posee| PROF
+        AUTH -->|registra| INT
+        AUTH -->|crea| REP
+    end
+
+    PIPE ==>|catálogo vigente| APP
+
+    class SRC,RUN ingest
+    class STG staging
+    class EV core
+    class ORG,COM,TAX reference
+    class EC,MED,PROV trace
+    class AUTH,PROF,INT,REP user
+
+    classDef ingest fill:#f5ece8,stroke:#c98570,stroke-width:2px,color:#26343b
+    classDef staging fill:#eef4f8,stroke:#4d91c7,stroke-width:2px,color:#26343b
+    classDef core fill:#334955,stroke:#334955,stroke-width:3px,color:#ffffff
+    classDef reference fill:#fff8ea,stroke:#b6975a,stroke-width:2px,color:#26343b
+    classDef trace fill:#eaf2f3,stroke:#368991,stroke-width:2px,color:#26343b
+    classDef user fill:#eef4f8,stroke:#4d91c7,stroke-width:2px,color:#26343b
+
+    style ING fill:#fffaf8,stroke:#c98570,stroke-width:1px
+    style CAT fill:#fbfcfc,stroke:#368991,stroke-width:1px
+    style APP fill:#f8fbfd,stroke:#4d91c7,stroke-width:1px
+    style PIPE fill:#ffffff,stroke:#ffffff,stroke-width:0px
+    style CONTEXT fill:#ffffff,stroke:#d7c89f,stroke-dasharray:4 3
+    style CONTENT fill:#ffffff,stroke:#a9c8cc,stroke-dasharray:4 3
+
+    linkStyle default stroke:#6f838c,stroke-width:1.7px
 ```
+
+Esta vista prioriza la lectura arquitectónica. Las cardinalidades formales se conservan en el
+archivo técnico `modelo_er.mmd`, que funciona como referencia relacional versionada.
 
 `scrape_runs` registra la salud de cada sincronización y no necesita una clave foránea hacia
 los eventos. Una ejecución puede descubrir cientos de eventos, pero los eventos permanecen

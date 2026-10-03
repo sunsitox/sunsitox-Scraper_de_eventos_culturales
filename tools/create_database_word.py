@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
 from docx import Document
-from docx.enum.section import WD_SECTION
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
@@ -16,7 +15,13 @@ from docx.shared import Inches, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "docs" / "DATABASE.md"
-OUTPUT = ROOT / "docs" / "Documentacion_Base_de_Datos_Eventos_Culturales.docx"
+MERMAID_SOURCE = ROOT / "docs" / "modelo_datos_visual.mmd"
+OUTPUT = Path(
+    os.environ.get(
+        "DB_DOC_OUTPUT",
+        ROOT / "docs" / "Documentacion_Base_de_Datos_Eventos_Culturales.docx",
+    )
+)
 DIAGRAM = ROOT / "docs" / "assets" / "database_relationships.png"
 
 NAVY = "17324D"
@@ -24,15 +29,71 @@ BLUE = "2E74B5"
 DARK_BLUE = "1F4D78"
 MUTED = "5E6B78"
 LIGHT_BLUE = "E8EEF5"
-LIGHT_GRAY = "F4F6F9"
 BORDER = "C9D3DE"
 WHITE = "FFFFFF"
 GOLD = "B8871B"
-RED = "9B1C1C"
 
 # Preset: compact_reference_guide.
 # Named overrides: editorial_cover; technical_table_body (9 pt);
 # code_block (Consolas 8.5 pt); relationship_figure.
+
+
+def strip_inline_markdown(value: str) -> str:
+    return re.sub(r"`([^`]+)`", r"\1", value).replace("**", "").strip()
+
+
+def extract_control_fields(text: str) -> dict[str, str]:
+    """Read cover/control metadata from DATABASE.md instead of duplicating it here."""
+    fields: dict[str, str] = {}
+    in_control = False
+    for line in text.splitlines():
+        if line.startswith("## 0. Control documental"):
+            in_control = True
+            continue
+        if in_control and line.startswith("## "):
+            break
+        if not in_control or not line.strip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 2 or cells[0] in {"Campo", "---"}:
+            continue
+        fields[strip_inline_markdown(cells[0])] = strip_inline_markdown(cells[1])
+    return fields
+
+
+def validate_source_contract(text: str, fields: dict[str, str]) -> None:
+    required_fields = {
+        "Tipo de documento",
+        "Título de portada",
+        "Proyecto",
+        "Subtítulo",
+        "Versión documentada",
+        "Esquema",
+        "Uso",
+        "Encabezado",
+        "Pie de página",
+        "Título del índice",
+        "Leyenda de figura 1",
+    }
+    missing = sorted(required_fields - fields.keys())
+    if missing:
+        raise ValueError(
+            "DATABASE.md no define los campos de control requeridos: "
+            + ", ".join(missing)
+        )
+
+    match = re.search(r"```mermaid\s*\n(.*?)\n```", text, flags=re.DOTALL)
+    if match is None:
+        raise ValueError("DATABASE.md no contiene un bloque Mermaid.")
+    if not MERMAID_SOURCE.exists():
+        raise FileNotFoundError(f"Falta la fuente Mermaid: {MERMAID_SOURCE}")
+    markdown_mermaid = match.group(1).strip().replace("\r\n", "\n")
+    canonical_mermaid = MERMAID_SOURCE.read_text(encoding="utf-8").strip().replace("\r\n", "\n")
+    if markdown_mermaid != canonical_mermaid:
+        raise ValueError(
+            "El bloque Mermaid de DATABASE.md no coincide exactamente con "
+            "docs/modelo_datos_visual.mmd."
+        )
 
 
 def set_cell_shading(cell, fill: str) -> None:
@@ -274,55 +335,6 @@ def apply_numbering(paragraph, num_id: int) -> None:
     p_pr.append(num_pr)
 
 
-def create_relationship_diagram(path: Path) -> None:
-    width, height = 1600, 880
-    image = Image.new("RGB", (width, height), "white")
-    draw = ImageDraw.Draw(image)
-    font_path = Path("C:/Windows/Fonts/arial.ttf")
-    bold_path = Path("C:/Windows/Fonts/arialbd.ttf")
-    font = ImageFont.truetype(str(font_path), 30)
-    small = ImageFont.truetype(str(font_path), 24)
-    bold = ImageFont.truetype(str(bold_path), 34)
-
-    def box(x, y, w, h, title, subtitle, fill=LIGHT_BLUE, outline=BLUE):
-        draw.rounded_rectangle((x, y, x + w, y + h), radius=20, fill=f"#{fill}", outline=f"#{outline}", width=4)
-        draw.text((x + 22, y + 17), title, font=bold, fill=f"#{NAVY}")
-        draw.text((x + 22, y + 64), subtitle, font=small, fill=f"#{MUTED}")
-
-    def arrow(x1, y1, x2, y2, label=""):
-        draw.line((x1, y1, x2, y2), fill=f"#{MUTED}", width=5)
-        angle = __import__("math").atan2(y2 - y1, x2 - x1)
-        length = 18
-        for delta in (2.55, -2.55):
-            px = x2 + length * __import__("math").cos(angle + delta)
-            py = y2 + length * __import__("math").sin(angle + delta)
-            draw.line((x2, y2, px, py), fill=f"#{MUTED}", width=5)
-        if label:
-            tx, ty = (x1 + x2) // 2, (y1 + y2) // 2 - 26
-            bbox = draw.textbbox((tx, ty), label, font=small, anchor="mm")
-            draw.rectangle((bbox[0] - 6, bbox[1] - 3, bbox[2] + 6, bbox[3] + 3), fill="white")
-            draw.text((tx, ty), label, font=small, fill=f"#{MUTED}", anchor="mm")
-
-    box(555, 325, 490, 150, "EVENTS", "Registro canónico consolidado", fill="DDEAF6")
-    box(70, 80, 370, 120, "SOURCES", "Procedencia")
-    box(615, 80, 370, 120, "ORGANIZERS", "Responsable")
-    box(1160, 80, 370, 120, "COMMUNES", "Territorio")
-    box(70, 620, 370, 120, "SCRAPE_RUNS", "Bitácora de carga", fill="F4F6F9", outline="7B8794")
-    box(615, 620, 370, 120, "MEDIA_ASSETS", "Imágenes y recursos")
-    box(1160, 325, 370, 150, "CATEGORIES", "Clasificación N:M")
-    box(1160, 650, 370, 150, "APP FUTURA", "Perfiles · favoritos · reportes", fill="FFF4D8", outline=GOLD)
-
-    arrow(255, 200, 555, 350, "1:N")
-    arrow(800, 200, 800, 325, "1:N")
-    arrow(1345, 200, 1045, 350, "1:N")
-    arrow(1045, 400, 1160, 400, "N:M")
-    arrow(800, 475, 800, 620, "1:N")
-    arrow(440, 650, 590, 470, "sincroniza")
-    arrow(1160, 690, 1000, 470, "favoritos / reportes")
-    draw.text((800, 835), "Relaciones principales del esquema public", font=font, fill=f"#{NAVY}", anchor="mm")
-    image.save(path, quality=95)
-
-
 def configure_styles(doc: Document) -> None:
     styles = doc.styles
     normal = styles["Normal"]
@@ -353,7 +365,7 @@ def configure_styles(doc: Document) -> None:
         style.paragraph_format.keep_with_next = True
 
 
-def configure_section(doc: Document) -> None:
+def configure_section(doc: Document, fields: dict[str, str]) -> None:
     section = doc.sections[0]
     section.page_width = Inches(8.5)
     section.page_height = Inches(11)
@@ -369,34 +381,35 @@ def configure_section(doc: Document) -> None:
     p = header.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p.paragraph_format.space_after = Pt(0)
-    run = p.add_run("EVENTOS CULTURALES · DICCIONARIO DE DATOS")
+    run = p.add_run(fields.get("Encabezado", "EVENTO CULTURAL · DOCUMENTACIÓN 2026"))
     set_run_font(run, size=8.5, color=MUTED, bold=True)
 
     footer = section.footer
     p = footer.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p.paragraph_format.space_before = Pt(0)
-    run = p.add_run("Uso personal  ·  Página ")
+    run = p.add_run(fields.get("Pie de página", "Uso personal · Página") + " ")
     set_run_font(run, size=8.5, color=MUTED)
     add_field(p, "PAGE")
 
 
-def add_cover(doc: Document) -> None:
+def add_cover(doc: Document, fields: dict[str, str]) -> None:
     for _ in range(4):
         doc.add_paragraph()
     kicker = doc.add_paragraph()
     kicker.alignment = WD_ALIGN_PARAGRAPH.CENTER
     kicker.paragraph_format.space_after = Pt(18)
-    run = kicker.add_run("DOCUMENTACIÓN TÉCNICA")
+    run = kicker.add_run(fields.get("Tipo de documento", "Documentación técnica").upper())
     set_run_font(run, size=10.5, color=GOLD, bold=True)
 
     title = doc.add_paragraph(style="Title")
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.add_run("Base de datos de\neventos culturales")
+    cover_title = fields.get("Título de portada", "Base de datos de eventos culturales")
+    title.add_run(cover_title.replace(" de eventos", " de\neventos", 1))
 
     subtitle = doc.add_paragraph(style="Subtitle")
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle.add_run("Diccionario de tablas, columnas, relaciones y categorías")
+    subtitle.add_run(fields.get("Subtítulo", "Diccionario de tablas, columnas, relaciones y categorías"))
 
     line = doc.add_paragraph()
     line.paragraph_format.space_before = Pt(18)
@@ -414,43 +427,33 @@ def add_cover(doc: Document) -> None:
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     meta.paragraph_format.space_after = Pt(5)
-    run = meta.add_run("MVP · Agregador de eventos culturales de Chile")
+    run = meta.add_run(fields.get("Proyecto", "MVP · Agregador de eventos culturales de Chile"))
     set_run_font(run, size=11, color=NAVY, bold=True)
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     meta.paragraph_format.space_after = Pt(5)
-    run = meta.add_run("Versión documentada: 1 de septiembre de 2026")
+    run = meta.add_run(f"Versión documentada: {fields.get('Versión documentada', 'sin especificar')}")
     set_run_font(run, size=10.5, color=MUTED)
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = meta.add_run("Documento de uso personal")
+    run = meta.add_run(fields.get("Uso", "Documento de uso personal"))
     set_run_font(run, size=10.5, color=MUTED, italic=True)
     doc.add_page_break()
 
 
-def add_contents(doc: Document, headings: list[str]) -> None:
-    doc.add_heading("Contenido", level=1)
-    intro = doc.add_paragraph("Guía de consulta rápida del esquema y su operación.")
-    intro.paragraph_format.space_after = Pt(12)
+def add_contents(doc: Document, headings: list[str], fields: dict[str, str]) -> None:
+    doc.add_heading(fields.get("Título del índice", "Contenido"), level=1)
     for index, heading in enumerate(headings, start=1):
-        heading = re.sub(r"^\d+\.\s*", "", heading)
+        numbered = re.match(r"^(\d+)\.\s*(.+)$", heading)
+        number = int(numbered.group(1)) if numbered else index
+        heading = numbered.group(2) if numbered else heading
         p = doc.add_paragraph()
         p.paragraph_format.left_indent = Inches(0.15)
         p.paragraph_format.space_after = Pt(5)
-        run = p.add_run(f"{index:02d}")
+        run = p.add_run(f"{number:02d}")
         set_run_font(run, size=9.5, color=GOLD, bold=True)
         run = p.add_run(f"   {heading}")
         set_run_font(run, size=11, color=NAVY, bold=True)
-    note = doc.add_paragraph()
-    note.paragraph_format.left_indent = Inches(0.12)
-    note.paragraph_format.right_indent = Inches(0.12)
-    note.paragraph_format.space_before = Pt(12)
-    note.paragraph_format.space_after = Pt(0)
-    p_pr = note._p.get_or_add_pPr()
-    shading = OxmlElement("w:shd")
-    shading.set(qn("w:fill"), LIGHT_GRAY)
-    p_pr.append(shading)
-    add_inline(note, "Nota: las categorías son dinámicas y la sección 5 representa una fotografía del conjunto local al 1 de septiembre de 2026.")
     doc.add_page_break()
 
 
@@ -519,15 +522,21 @@ def add_code_block(doc: Document, lines: list[str]) -> None:
         set_run_font(run, name="Consolas", size=8.5, color=NAVY)
 
 
-def add_relationship_figure(doc: Document) -> None:
-    create_relationship_diagram(DIAGRAM)
+def add_relationship_figure(doc: Document, fields: dict[str, str]) -> None:
+    if not DIAGRAM.exists():
+        raise FileNotFoundError(
+            f"Falta el render Mermaid versionado: {DIAGRAM}. "
+            "Genérelo desde docs/modelo_datos_visual.mmd antes de crear el Word."
+        )
     paragraph = doc.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     paragraph.paragraph_format.space_after = Pt(4)
     run = paragraph.add_run()
     inline = run.add_picture(str(DIAGRAM), width=Inches(6.25))
-    inline._inline.docPr.set("descr", "Diagrama de relaciones entre fuentes, organizadores, comunas, eventos, categorías, multimedia y tablas futuras.")
-    caption = doc.add_paragraph("Figura 1. Relaciones principales del esquema de datos.")
+    inline._inline.docPr.set("descr", "Vista por capas del modelo de datos: ingesta, catálogo cultural, aplicación y usuarios.")
+    caption = doc.add_paragraph(
+        fields.get("Leyenda de figura 1", "Figura 1. Vista por capas del modelo de datos vigente.")
+    )
     caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
     caption.paragraph_format.space_before = Pt(0)
     caption.paragraph_format.space_after = Pt(10)
@@ -539,32 +548,28 @@ def build_document() -> None:
     text = SOURCE.read_text(encoding="utf-8")
     source_lines = text.splitlines()
     level_two_headings = [line[3:].strip() for line in source_lines if line.startswith("## ")]
+    control_fields = extract_control_fields(text)
+    validate_source_contract(text, control_fields)
 
     doc = Document()
     configure_styles(doc)
-    configure_section(doc)
-    doc.core_properties.title = "Base de datos de eventos culturales"
-    doc.core_properties.subject = "Diccionario de tablas, columnas, relaciones y categorías"
+    configure_section(doc, control_fields)
+    doc.core_properties.title = control_fields.get("Título de portada", "Base de datos de eventos culturales")
+    doc.core_properties.subject = control_fields.get("Subtítulo", "Diccionario de tablas, columnas, relaciones y categorías")
     doc.core_properties.author = ""
     doc.core_properties.last_modified_by = ""
     doc.core_properties.keywords = "Supabase, PostgreSQL, eventos culturales, diccionario de datos"
 
     bullet_num_id = add_numbering_definition(doc, "bullet")
     decimal_num_id = add_numbering_definition(doc, "decimal")
-    add_cover(doc)
-    add_contents(doc, level_two_headings)
+    add_cover(doc, control_fields)
+    add_contents(doc, level_two_headings, control_fields)
 
     lines = source_lines[1:]
     index = 0
-    skip_metadata = True
     while index < len(lines):
         line = lines[index]
         stripped = line.strip()
-
-        if skip_metadata and (not stripped or stripped.startswith("**Versión") or stripped.startswith("**Esquema") or stripped.startswith("**Migración")):
-            index += 1
-            continue
-        skip_metadata = False
 
         if stripped.startswith("```"):
             language = stripped[3:].strip()
@@ -574,7 +579,7 @@ def build_document() -> None:
                 block.append(lines[index])
                 index += 1
             if language == "mermaid":
-                add_relationship_figure(doc)
+                add_relationship_figure(doc, control_fields)
             else:
                 add_code_block(doc, block)
             index += 1
@@ -601,6 +606,9 @@ def build_document() -> None:
             paragraph = doc.add_paragraph()
             apply_numbering(paragraph, decimal_num_id)
             add_inline(paragraph, re.sub(r"^\d+\. ", "", stripped))
+        elif stripped.startswith(">"):
+            paragraph = doc.add_paragraph()
+            add_inline(paragraph, stripped.lstrip("> "))
         elif stripped:
             paragraph = doc.add_paragraph()
             add_inline(paragraph, stripped)

@@ -1,15 +1,31 @@
 # Diccionario de datos · Eventos culturales de Chile
 
-**Versión documentada:** 3 de octubre de 2026
+## 0. Control documental
 
-**Esquema:** `public` de Supabase/PostgreSQL
+| Campo | Valor |
+|---|---|
+| Tipo de documento | Documentación técnica |
+| Título de portada | Base de datos de eventos culturales |
+| Proyecto | MVP · Agregador de eventos culturales de Chile |
+| Subtítulo | Diccionario de tablas, columnas, relaciones y categorías |
+| Versión documentada | 3 de octubre de 2026 |
+| Esquema | `public` de Supabase/PostgreSQL |
+| Uso | Documento de uso personal |
+| Encabezado | EVENTO CULTURAL · DOCUMENTACIÓN 2026 |
+| Pie de página | Uso personal · Página |
+| Título del índice | Contenido |
+| Leyenda de figura 1 | Figura 1. Vista por capas del modelo de datos vigente. |
 
-**Migraciones de referencia:** `supabase/migrations/20260831000100_initial_event_catalog.sql`,
-`supabase/migrations/20260902000100_event_location_metadata.sql`,
-`supabase/migrations/20260911000100_content_enrichment_and_organizer_controls.sql` y
-`supabase/migrations/20260912000100_rewrite_state_and_reconciliation.sql`,
-`supabase/migrations/20260921000100_atomic_catalog_publication.sql` y
-`supabase/migrations/20260924000100_user_recommendation_interactions.sql`.
+### Migraciones de referencia
+
+- `supabase/migrations/20260831000100_initial_event_catalog.sql`
+- `supabase/migrations/20260902000100_event_location_metadata.sql`
+- `supabase/migrations/20260911000100_content_enrichment_and_organizer_controls.sql`
+- `supabase/migrations/20260912000100_rewrite_state_and_reconciliation.sql`
+- `supabase/migrations/20260921000100_atomic_catalog_publication.sql`
+- `supabase/migrations/20260924000100_user_recommendation_interactions.sql`
+
+### Alcance y fuente de verdad
 
 Este documento describe la base de datos del MVP, el significado de sus tablas y columnas,
 las relaciones, las políticas de acceso y la taxonomía observada. El boceto visual original se
@@ -19,6 +35,11 @@ utilizó solamente como referencia relacional; los campos de esta base provienen
 > **Fuente de verdad:** ante cualquier diferencia entre este documento, el DBML y la instalación
 > remota, prevalece el conjunto ordenado de migraciones SQL versionadas. La migración del 24 de
 > septiembre reemplazó definitivamente `favorites` por `user_event_interactions`.
+
+### Estado del modelo
+
+La versión vigente reemplaza `favorites` por `user_event_interactions` y publica el catálogo
+mediante `catalog_staging` y la función transaccional `publish_staged_catalog(...)`.
 
 ## 1. Vista general
 
@@ -58,11 +79,13 @@ flowchart LR
       subgraph CAT["02  CATÁLOGO CULTURAL"]
         direction TB
         EV[("events<br/><span>registro canónico</span>")]
+
         subgraph CONTEXT["CONTEXTO"]
             direction LR
             ORG["organizers"]
             COM["communes"]
         end
+
         subgraph CONTENT["CONTENIDO Y EVIDENCIA"]
             direction LR
             TAX["categories"]
@@ -70,6 +93,7 @@ flowchart LR
             MED["media_assets"]
             PROV["event_provenance"]
         end
+
         ORG -->|organiza| EV
         COM -->|localiza| EV
         EV -->|clasifica| EC

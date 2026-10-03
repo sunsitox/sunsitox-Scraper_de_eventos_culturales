@@ -1,17 +1,24 @@
 # Diccionario de datos · Eventos culturales de Chile
 
-**Versión documentada:** 21 de septiembre de 2026  
-**Esquema:** `public` de Supabase/PostgreSQL  
+**Versión documentada:** 3 de octubre de 2026
+
+**Esquema:** `public` de Supabase/PostgreSQL
+
 **Migraciones de referencia:** `supabase/migrations/20260831000100_initial_event_catalog.sql`,
 `supabase/migrations/20260902000100_event_location_metadata.sql`,
 `supabase/migrations/20260911000100_content_enrichment_and_organizer_controls.sql` y
-`supabase/migrations/20260912000100_rewrite_state_and_reconciliation.sql`, además de
-`supabase/migrations/20260921000100_atomic_catalog_publication.sql`.
+`supabase/migrations/20260912000100_rewrite_state_and_reconciliation.sql`,
+`supabase/migrations/20260921000100_atomic_catalog_publication.sql` y
+`supabase/migrations/20260924000100_user_recommendation_interactions.sql`.
 
 Este documento describe la base de datos del MVP, el significado de sus tablas y columnas,
 las relaciones, las políticas de acceso y la taxonomía observada. El boceto visual original se
 utilizó solamente como referencia relacional; los campos de esta base provienen del modelo real
 `Event` y de las necesidades operativas del recolector.
+
+> **Fuente de verdad:** ante cualquier diferencia entre este documento, el DBML y la instalación
+> remota, prevalece el conjunto ordenado de migraciones SQL versionadas. La migración del 24 de
+> septiembre reemplazó definitivamente `favorites` por `user_event_interactions`.
 
 ## 1. Vista general
 
@@ -50,13 +57,24 @@ vigentes entre ejecuciones mediante sus identificadores deterministas.
 | `scrape_runs` | Bitácora técnica de ejecuciones locales y de GitHub Actions. |
 | `catalog_staging` | Fragmentos privados temporales usados para publicar un lote de forma atómica. |
 
-### Tablas previstas para la aplicación
+### Tablas de aplicación y usuarios
 
 | Tabla | Finalidad |
 |---|---|
 | `profiles` | Perfil público mínimo asociado a Supabase Auth. |
 | `user_event_interactions` | Señales de comportamiento para recomendaciones: visualizaciones, interés, descarte, aperturas y compartidos. |
 | `reports` | Avisos de usuarios sobre información incorrecta o problemática. |
+
+### Vistas y funciones operativas
+
+| Objeto | Tipo | Finalidad |
+|---|---|---|
+| `public_event_catalog` | Vista pública | Entrega eventos publicados con `source_name` y `organizer_name`, respetando RLS, supresión y bloqueos. |
+| `set_updated_at()` | Trigger function | Mantiene automáticamente las columnas `updated_at`. |
+| `handle_new_user()` | Trigger function | Crea el perfil mínimo al registrarse un usuario en Supabase Auth. |
+| `match_existing_events(jsonb)` | RPC privada | Detecta coincidencias antes de OCR y redacción, y reutiliza procedencia editorial existente. |
+| `is_organizer_blocked(uuid)` | Función de seguridad | Permite aplicar la exclusión de organizadores sin exponer sus columnas administrativas. |
+| `publish_staged_catalog(...)` | RPC privada y transaccional | Publica un lote completo desde staging, reconcilia registros obsoletos y elimina eventos vencidos. |
 
 ## 2. Convenciones generales
 
@@ -439,7 +457,7 @@ La migración habilita Row Level Security en todas las tablas.
 | Rol | Acceso efectivo |
 |---|---|
 | `anon` | Lectura de fuentes activas, organizadores no bloqueados, comunas, categorías y eventos publicados de organizadores permitidos. |
-| `authenticated` | La misma lectura pública; además puede leer/editar su nombre de perfil, administrar sus favoritos y crear/ver sus propios reportes. |
+| `authenticated` | La misma lectura pública; además puede leer/editar su nombre de perfil, registrar/eliminar sus propias interacciones y crear/ver sus propios reportes. |
 | `service_role` | Acceso completo para el proceso de ingesta. Debe permanecer exclusivamente en backend o CI. |
 
 `scrape_runs` no posee lectura pública. El usuario no puede cambiar su propio `role` ni actualizar
@@ -448,6 +466,11 @@ el estado de sus reportes desde el frontend.
 La vista `public_event_catalog` está disponible para `anon`, `authenticated` y `service_role`.
 Une cada evento con `source_name` y `organizer_name`; con usuarios públicos hereda las políticas
 RLS de las tablas y, por tanto, no expone eventos suprimidos ni organizadores bloqueados.
+
+`event_provenance`, `catalog_staging`, `scrape_runs`, `match_existing_events(jsonb)` y
+`publish_staged_catalog(...)` no se exponen al navegador. Se reservan al proceso de ingesta que
+opera con `service_role`. La función `is_organizer_blocked(uuid)` puede ejecutarse desde las
+políticas públicas, pero solo devuelve un booleano y no revela el motivo ni la fecha del bloqueo.
 
 ## 8. Ciclo de carga
 

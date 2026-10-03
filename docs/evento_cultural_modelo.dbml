@@ -16,6 +16,9 @@ Table organizers {
   name text [not null]
   entity_type text
   last_seen_at timestamptz
+  is_blocked boolean [not null, default: false, note: 'Control administrativo privado']
+  blocked_reason text
+  blocked_at timestamptz
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 }
@@ -60,7 +63,16 @@ Table events {
   city text
   region text
   country text [not null, default: 'Chile']
+  postal_code text
+  latitude double [note: 'PostgreSQL double precision; entre -90 y 90']
+  longitude double [note: 'PostgreSQL double precision; entre -180 y 180']
+  location text [not null]
+  location_precision text [not null, note: 'exact | coordinates | venue | commune | city | region | online | country']
+  location_source text [not null, note: 'source-data | source-default | deterministic-inference | nvidia-nim | geographic-fallback']
   status text [not null, default: 'published', note: 'published | cancelled | draft | archived']
+  is_suppressed boolean [not null, default: false, note: 'Exclusión administrativa persistente']
+  suppression_reason text
+  suppressed_at timestamptz
   audience text
   is_free boolean
   description text
@@ -73,6 +85,15 @@ Table events {
   scraped_at timestamptz [not null, default: `now()`]
   last_seen_at timestamptz [not null, default: `now()`]
   created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table event_provenance {
+  event_id uuid [pk, ref: - events.id]
+  original_url text
+  source_description text
+  ocr_text text
+  is_rewritten boolean [not null, default: false]
   updated_at timestamptz [not null, default: `now()`]
 }
 
@@ -103,6 +124,19 @@ Table profiles {
   updated_at timestamptz [not null, default: `now()`]
 }
 
+Table catalog_staging {
+  run_id uuid [not null]
+  entity text [not null, note: 'sources | organizers | communes | categories | events | event_provenance | event_categories | media_assets']
+  chunk_index integer [not null, note: 'Mayor o igual que cero']
+  payload jsonb [not null, note: 'Arreglo JSON privado']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (run_id, entity, chunk_index) [pk]
+    created_at
+  }
+}
+
 Table user_event_interactions {
   id uuid [pk, default: `gen_random_uuid()`]
   user_id uuid [not null, ref: > auth_users.id]
@@ -126,3 +160,9 @@ Table reports {
 Table auth_users {
   id uuid [pk, note: 'Gestionada por Supabase Auth (auth.users)']
 }
+
+// Objetos no representables como tablas en DBML:
+// - vista public_event_catalog
+// - funciones set_updated_at(), handle_new_user(), match_existing_events(jsonb),
+//   is_organizer_blocked(uuid) y publish_staged_catalog(...)
+// - favorites fue eliminada por 20260924000100_user_recommendation_interactions.sql

@@ -1,0 +1,38 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "background": "#ffffff",
+    "primaryColor": "#f7f9fa",
+    "primaryTextColor": "#26343b",
+    "primaryBorderColor": "#7f9aa5",
+    "lineColor": "#506874",
+    "secondaryColor": "#eaf2f3",
+    "tertiaryColor": "#f5ece8",
+    "fontFamily": "Arial",
+    "fontSize": "15px"
+  },
+  "er": {
+    "diagramPadding": 24,
+    "layoutDirection": "TB",
+    "minEntityWidth": 130,
+    "minEntityHeight": 42,
+    "entityPadding": 12,
+    "stroke": "#7f9aa5",
+    "fill": "#f7f9fa"
+  }
+}}%%
+erDiagram
+    SOURCES ||--o{ EVENTS : publica
+    ORGANIZERS |o--o{ EVENTS : organiza
+    COMMUNES |o--o{ EVENTS : localiza
+    EVENTS ||--o{ EVENT_CATEGORIES : clasifica
+    CATEGORIES ||--o{ EVENT_CATEGORIES : agrupa
+    EVENTS ||--o{ MEDIA_ASSETS : contiene
+    EVENTS ||--o| EVENT_PROVENANCE : conserva_evidencia
+    AUTH_USERS ||--|| PROFILES : posee
+    AUTH_USERS ||--o{ USER_EVENT_INTERACTIONS : registra
+    EVENTS ||--o{ USER_EVENT_INTERACTIONS : recibe
+    AUTH_USERS ||--o{ REPORTS : crea
+    EVENTS ||--o{ REPORTS : recibe
+    SCRAPE_RUNS ||--o{ CATALOG_STAGING : agrupa_logicamente
+

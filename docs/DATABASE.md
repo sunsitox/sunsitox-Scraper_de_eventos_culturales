@@ -23,10 +23,23 @@ utilizó solamente como referencia relacional; los campos de esta base provienen
 ## 1. Vista general
 
 ```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "background": "#ffffff",
+    "primaryColor": "#f7f9fa",
+    "primaryTextColor": "#26343b",
+    "primaryBorderColor": "#7f9aa5",
+    "lineColor": "#506874",
+    "secondaryColor": "#eaf2f3",
+    "tertiaryColor": "#f5ece8",
+    "fontFamily": "Arial"
+  }
+}}%%
 erDiagram
     SOURCES ||--o{ EVENTS : publica
-    ORGANIZERS ||--o{ EVENTS : organiza
-    COMMUNES ||--o{ EVENTS : localiza
+    ORGANIZERS |o--o{ EVENTS : organiza
+    COMMUNES |o--o{ EVENTS : localiza
     EVENTS ||--o{ EVENT_CATEGORIES : clasifica
     CATEGORIES ||--o{ EVENT_CATEGORIES : agrupa
     EVENTS ||--o{ MEDIA_ASSETS : contiene
@@ -36,6 +49,7 @@ erDiagram
     EVENTS ||--o{ USER_EVENT_INTERACTIONS : recibe
     AUTH_USERS ||--o{ REPORTS : crea
     EVENTS ||--o{ REPORTS : recibe
+    SCRAPE_RUNS ||--o{ CATALOG_STAGING : agrupa_logicamente
 ```
 
 `scrape_runs` registra la salud de cada sincronización y no necesita una clave foránea hacia

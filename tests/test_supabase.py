@@ -118,6 +118,8 @@ class SupabaseExporterTests(unittest.TestCase):
         self.assertTrue(any(call[0] == "publish" for call in client.calls))
         self.assertEqual(tables[-1], "scrape_runs")
         self.assertEqual(client.calls[-1][2][0]["status"], "succeeded")
+        self.assertEqual(client.calls[-1][2][0]["metadata"]["removed_stale"], 2)
+        self.assertEqual(client.calls[-1][2][0]["metadata"]["removed_expired"], 3)
         self.assertFalse(any(call[0] == "delete_expired" for call in client.calls))
 
     def test_bundle_never_uploads_an_expired_event(self):
@@ -296,6 +298,63 @@ class SupabaseExporterTests(unittest.TestCase):
 
 
 class SupabaseConfigurationTests(unittest.TestCase):
+    def test_matching_more_than_api_row_limit_preserves_all_candidates(self):
+        client = SupabaseRestClient(
+            SupabaseConfig("https://example.supabase.co", "sb_secret_example", batch_size=5000)
+        )
+        events = [
+            Event(title=f"Evento {i}", event_id=f"event-{i}")
+            for i in range(1205)
+        ]
+
+        def limited_rpc(function, payload):
+            # Simula el limite de filas de la API. La implementacion anterior
+            # enviaba 1205 candidatos juntos y perdia las coincidencias finales.
+            return [
+                {"local_key": row["local_key"], "stored_external_key": row["external_key"]}
+                for row in payload["candidates"][:1000]
+            ]
+
+        with patch.object(client, "rpc", side_effect=limited_rpc) as rpc:
+            matches = client.match_existing_events(events)
+        self.assertEqual(len(matches), 1205)
+        self.assertIn("event-1204", matches)
+        self.assertEqual(rpc.call_count, 3)
+        self.assertTrue(all(
+            len(call.args[1]["candidates"]) <= 500
+            for call in rpc.call_args_list
+        ))
+
+    def test_shared_listing_urls_are_ignored_across_matching_batches(self):
+        client = SupabaseRestClient(
+            SupabaseConfig("https://example.supabase.co", "sb_secret_example", batch_size=1)
+        )
+        events = [
+            Event(title="Primero", event_id="one", source_url="https://example.cl/agenda/"),
+            Event(title="Segundo", event_id="two", source_url="https://example.cl/agenda/#top"),
+            Event(title="Tercero", event_id="three", source_url="https://example.cl/detail/"),
+        ]
+        with patch.object(client, "rpc", return_value=[]) as rpc:
+            self.assertEqual(client.match_existing_events(events), {})
+        submitted = [call.args[1]["candidates"][0] for call in rpc.call_args_list]
+        self.assertEqual([row["source_url"] for row in submitted], [
+            "", "", "https://example.cl/detail"
+        ])
+
+    def test_matching_respects_configured_small_batch_and_empty_input(self):
+        client = SupabaseRestClient(
+            SupabaseConfig("https://example.supabase.co", "sb_secret_example", batch_size=2)
+        )
+        with patch.object(client, "rpc", return_value=[]) as rpc:
+            self.assertEqual(client.match_existing_events([]), {})
+            rpc.assert_not_called()
+            client.match_existing_events([
+                Event(title=f"Evento {i}", event_id=f"event-{i}") for i in range(5)
+            ])
+        self.assertEqual([
+            len(call.args[1]["candidates"]) for call in rpc.call_args_list
+        ], [2, 2, 1])
+
     def test_select_retries_a_transient_timeout(self):
         class Session:
             def __init__(self):

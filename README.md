@@ -102,6 +102,17 @@ El inventario y la justificación de las agendas consultadas están documentados
 Las reglas comunes de formato para documentos y diagramas están en
 [`docs/ESTANDAR_DOCUMENTACION.md`](docs/ESTANDAR_DOCUMENTACION.md).
 
+### Cambios de base de datos y scraper del 20 de octubre de 2026
+
+Las migraciones `20261020000100`, `20261020000200` y `20261020000300` incorporan la limpieza
+protegida, índices de URL para deduplicación previa a IA y su integración con la publicación
+atómica. No añaden tablas ni columnas. Al instalarlas no se ejecuta ninguna limpieza.
+
+El scraper consulta coincidencias por lotes de hasta 500 candidatos (200 en el workflow),
+reutiliza el OCR y la redacción que no necesitan cambios y registra los contadores
+`removed_stale` y `removed_expired` en `scrape_runs.metadata` después de publicar correctamente.
+Las reglas exactas, permisos y limitaciones están en [`docs/DATABASE.md`](docs/DATABASE.md).
+
 Para crear o actualizar las tablas desde Windows, ejecuta `migrar_supabase.bat`. El identificador
 del proyecto se obtiene automáticamente desde `SUPABASE_URL` en `.env`.
 
@@ -249,10 +260,12 @@ recomienda 4) y `HTTP_CACHE_ENABLED` permite apagar la caché condicional. Aumen
 elimina las pausas por dominio ni modifica el límite de 40 RPM de NVIDIA.
 
 `EVENT_DESCRIPTION_MAX_CHARS=8000` evita conservar cuerpos HTML desproporcionados. En Supabase,
-`SUPABASE_DELETE_EXPIRED=true` elimina en cada sincronización los eventos cuyo término ya pasó; si
-no existe `end_at`, utiliza `start_at`. Las relaciones de categorías e imágenes se eliminan en
-cascada. Los registros sin una fecha inicial válida se descartan antes de exportar o publicar. Las
-fechas sin offset publicado se interpretan en `America/Santiago`.
+`SUPABASE_DELETE_EXPIRED=true` activa la limpieza al finalizar una publicación correcta: elimina
+eventos cuyo término ya pasó según el reloj de PostgreSQL. Si no existe `end_at`, conserva el
+evento durante todo el día de inicio en `America/Santiago`. No elimina eventos suprimidos, con
+interacciones de usuarios ni con fechas incompletas o incoherentes. La conciliación por ausencia
+protege además las publicaciones manuales. Las relaciones dependientes se eliminan en cascada.
+Las fechas sin offset publicado se interpretan en `America/Santiago`.
 
 Las regiones se controlan en `settings.json`. Puedes agregar otra región copiando exactamente el nombre que entrega Chile Cultura. `include_unknown_region` determina si se conservan fichas que no informan región.
 
@@ -266,6 +279,16 @@ Las pruebas validan el catálogo mínimo de diez fuentes activas, el registro de
 mapeo WordPress, JSON-LD, la deduplicación, el filtro regional y la transformación idempotente
 del conjunto al esquema de Supabase. También validan la caché condicional, la lectura directa de
 Maipú, el contador, el temporizador y los resúmenes operativos.
+
+El workflow `scrape-events.yml` ejecuta primero el trabajo `validate`: pruebas de Python y
+migraciones/pruebas SQL en PostgreSQL 17 temporal. Solo si pasa comienza `scrape`, que conserva
+la extracción por fases y sus checkpoints. La base temporal no usa credenciales reales ni lee
+`.env`; `tools/test_database.sh` exige una base vacía llamada `eventos_test`. No ejecutar estas
+pruebas SQL sobre Supabase de producción.
+
+Se mantiene el horario diario configurado de las **23:37, America/Santiago**, además de la
+ejecución manual. El horario es de programación, no una garantía de inicio exacto. Las
+migraciones de producción se aplican por separado con `migrar_supabase.bat`, no en cada corrida.
 
 ## Auditar el inventario de fuentes
 

@@ -8,7 +8,7 @@
 | Título de portada | Base de datos de eventos culturales |
 | Proyecto | MVP · Agregador de eventos culturales de Chile |
 | Subtítulo | Diccionario de tablas, columnas, relaciones y categorías |
-| Versión documentada | 3 de octubre de 2026 |
+| Versión documentada | 20 de octubre de 2026 |
 | Esquema | `public` de Supabase/PostgreSQL |
 | Uso | Documento de uso personal |
 | Encabezado | EVENTO CULTURAL · DOCUMENTACIÓN 2026 |
@@ -24,6 +24,9 @@
 - `supabase/migrations/20260912000100_rewrite_state_and_reconciliation.sql`
 - `supabase/migrations/20260921000100_atomic_catalog_publication.sql`
 - `supabase/migrations/20260924000100_user_recommendation_interactions.sql`
+- `supabase/migrations/20261020000100_cleanup_expired_events.sql`
+- `supabase/migrations/20261020000200_optimize_event_matching.sql`
+- `supabase/migrations/20261020000300_integrate_expired_cleanup.sql`
 
 ### Alcance y fuente de verdad
 
@@ -40,6 +43,21 @@ utilizó solamente como referencia relacional; los campos de esta base provienen
 
 La versión vigente reemplaza `favorites` por `user_event_interactions` y publica el catálogo
 mediante `catalog_staging` y la función transaccional `publish_staged_catalog(...)`.
+La revisión del 20 de octubre añade `cleanup_expired_events()`, optimiza la búsqueda previa a IA
+con dos índices de URL y conecta la limpieza protegida con la publicación. No añade tablas ni
+columnas, por lo que el modelo ER conserva sus entidades y relaciones.
+
+### Registro de cambios del 20 de octubre de 2026
+
+| Migración | Cambio | Efecto al instalar |
+|---|---|---|
+| `20261020000100` | Crea la RPC privada `cleanup_expired_events()` para eventos manuales y extraídos. Usa la hora del servidor y protege supresiones e interacciones. | Crea la función y sus permisos; no borra eventos. |
+| `20261020000200` | Añade índices de URL y reescribe `match_existing_events(jsonb)` sin cambiar su contrato REST. | Construye índices y reemplaza la consulta; no modifica filas del catálogo. |
+| `20261020000300` | Integra la limpieza en `publish_staged_catalog(...)` y protege la conciliación frente a eventos manuales o con interacciones. | Reemplaza la función de publicación; no la ejecuta. |
+
+Las nueve migraciones locales y remotas quedaron sincronizadas el 20 de octubre. La aplicación
+de estas migraciones no ejecutó el scraper ni una limpieza sobre el catálogo existente. El nuevo
+comportamiento se utiliza en la siguiente publicación que termine correctamente.
 
 ## 1. Vista general
 
@@ -181,9 +199,10 @@ vigentes entre ejecuciones mediante sus identificadores deterministas.
 | `public_event_catalog` | Vista pública | Entrega eventos publicados con `source_name` y `organizer_name`, respetando RLS, supresión y bloqueos. |
 | `set_updated_at()` | Trigger function | Mantiene automáticamente las columnas `updated_at`. |
 | `handle_new_user()` | Trigger function | Crea el perfil mínimo al registrarse un usuario en Supabase Auth. |
-| `match_existing_events(jsonb)` | RPC privada | Detecta coincidencias antes de OCR y redacción, y reutiliza procedencia editorial existente. |
+| `match_existing_events(jsonb)` | RPC privada de lectura | Detecta coincidencias por clave externa o URL antes de OCR y redacción; utiliza índices y devuelve una coincidencia por clave local. |
 | `is_organizer_blocked(uuid)` | Función de seguridad | Permite aplicar la exclusión de organizadores sin exponer sus columnas administrativas. |
 | `publish_staged_catalog(...)` | RPC privada y transaccional | Publica un lote completo desde staging, reconcilia registros obsoletos y elimina eventos vencidos. |
+| `cleanup_expired_events()` | RPC privada | Devuelve la cantidad eliminada como `bigint`. Limpia vencidos usando el reloj de PostgreSQL y conserva supresiones e interacciones. |
 
 ## 2. Convenciones generales
 
@@ -365,11 +384,15 @@ o falló durante la carga.
 | `status` | `text` | Obligatorio | `running`, `succeeded` o `failed`. |
 | `events_count` | `integer` | No negativo | Cantidad de eventos consolidados que se intentó cargar. |
 | `error_message` | `text` | Opcional | Resumen técnico del error, limitado por el cliente a 2.000 caracteres. |
-| `metadata` | `jsonb` | `{}` por defecto | Entorno de ejecución: `runner`, repositorio, ID de GitHub Actions, commit y evento disparador. |
+| `metadata` | `jsonb` | `{}` por defecto | Entorno de ejecución: `runner`, repositorio, ID de GitHub Actions, commit y evento disparador. En publicaciones exitosas incluye `removed_stale` y `removed_expired`. |
 
 Los fragmentos se cargan primero en `catalog_staging`, que no es visible al público. La función
 `publish_staged_catalog` aplica el catálogo, relaciones y limpieza dentro de una única transacción;
 si falla, las tablas públicas conservan el estado anterior.
+`removed_stale` cuenta los registros retirados por ausencia en fuentes conciliadas;
+`removed_expired`, los borrados después por vencimiento. No representan el total restante de la
+base. Las ejecuciones históricas pueden no tener estas claves. La bitácora de éxito se actualiza
+después de la RPC: si falla esa escritura, no revierte una publicación ya confirmada.
 
 ### `catalog_staging`
 
@@ -436,6 +459,19 @@ Reportes de usuarios sobre un evento, por ejemplo fecha incorrecta, evento cance
 - `media_assets` no permite repetir la misma URL dentro de un evento.
 - Existen índices para fecha de inicio, región, estado, fuente, comuna y búsquedas por categoría.
 - Los valores de estados, roles y tipos multimedia se controlan mediante restricciones `check`.
+
+### Índices de deduplicación previa a IA
+
+`events_match_source_url_idx` y `events_match_official_url_idx` son índices B-tree de expresión.
+Ambos utilizan `lower(split_part(rtrim(url, '/'), '#', 1))`, sustituyendo `url` por su columna
+respectiva. El cliente envía la URL candidata normalizada; la consulta mantiene exactamente la
+misma expresión en el lado almacenado para poder utilizar esos índices. La clave
+`external_key` conserva el índice único que ya tenía.
+
+La RPC separa las búsquedas por clave, URL de extracción y URL oficial mediante `UNION ALL`.
+Después conserva la coincidencia con `last_seen_at` más reciente por `local_key`; ante empate,
+ordena por `events.id`. Sigue devolviendo los textos editoriales, el OCR, la procedencia y la
+supresión existentes. Es `STABLE`, no modifica datos y mantiene la firma REST anterior.
 
 ## 5. Diccionario de categorías observadas
 
@@ -576,8 +612,8 @@ La vista `public_event_catalog` está disponible para `anon`, `authenticated` y 
 Une cada evento con `source_name` y `organizer_name`; con usuarios públicos hereda las políticas
 RLS de las tablas y, por tanto, no expone eventos suprimidos ni organizadores bloqueados.
 
-`event_provenance`, `catalog_staging`, `scrape_runs`, `match_existing_events(jsonb)` y
-`publish_staged_catalog(...)` no se exponen al navegador. Se reservan al proceso de ingesta que
+`event_provenance`, `catalog_staging`, `scrape_runs`, `match_existing_events(jsonb)`,
+`cleanup_expired_events()` y `publish_staged_catalog(...)` no se exponen al navegador. Se reservan al proceso de ingesta que
 opera con `service_role`. La función `is_organizer_blocked(uuid)` puede ejecutarse desde las
 políticas públicas, pero solo devuelve un booleano y no revela el motivo ni la fecha del bloqueo.
 
@@ -587,20 +623,60 @@ políticas públicas, pero solo devuelve un booleano y no revela el motivo ni la
 2. Los conectores producen objetos `Event` con un esquema común.
 3. El pipeline elimina duplicados y fija un identificador estable.
 4. Se aplican metadatos geográficos estáticos y reglas deterministas.
-5. Supabase identifica coincidencias por URL original o clave título-fecha-lugar y devuelve los
-   organizadores bloqueados.
-6. Solo los eventos nuevos pasan por OCR, redacción editorial y normalización NVIDIA.
+5. Supabase identifica coincidencias por clave externa o URL original/oficial y devuelve los
+   organizadores bloqueados. La clave externa procede de la consolidación título-fecha-lugar.
+6. Solo los eventos nuevos, modificados o con enriquecimiento pendiente pasan por OCR, redacción
+   editorial y normalización NVIDIA. Los que no cambiaron reutilizan los resultados guardados.
 7. Se filtran regiones y pertinencia cultural, y se genera la ubicación canónica.
 8. Se generan respaldos JSON y CSV.
 9. Se crea una fila `running` en `scrape_runs`.
 10. Se cargan fragmentos privados en `catalog_staging`.
-11. Una RPC transaccional publica entidades, eventos, procedencia, relaciones y limpieza.
+11. `publish_staged_catalog(...)` publica entidades, eventos, procedencia y relaciones; concilia
+    ausencias y, si está habilitado, llama a `cleanup_expired_events()` en la misma transacción.
 12. La ejecución se marca `succeeded` o `failed`.
 
 La carga empieza **después** de finalizar la extracción completa; no se sube un evento inmediatamente
-después de encontrarlo. `SUPABASE_BATCH_SIZE` controla la cantidad máxima por solicitud REST.
+después de encontrarlo. `SUPABASE_BATCH_SIZE` controla los fragmentos de carga. Para las consultas
+de coincidencias, el cliente acota cada lote entre 1 y 500 candidatos, incluso si la configuración
+es mayor; el workflow utiliza 200. Así evita que una respuesta de más de 1.000 coincidencias se
+trunque con el límite habitual de filas de PostgREST.
 Todas las operaciones NVIDIA comparten el límite `NVIDIA_RPM_LIMIT`; con el valor 40 se fuerza
 un intervalo seguro de al menos 1,55 segundos entre inicios de solicitudes.
+
+### Reglas de limpieza por vencimiento
+
+Con `SUPABASE_DELETE_EXPIRED=true`, la publicación invoca `cleanup_expired_events()` después de
+la conciliación. Es una función PostgreSQL invocable por RPC, no un trigger ni un `PROCEDURE`
+que requiera `CALL`. Su reloj de referencia es `now()` del servidor, correspondiente al inicio
+de la transacción. La firma antigua de publicación conserva `p_current_time` y `p_day_start`
+por compatibilidad, pero ya no los utiliza para decidir el vencimiento.
+
+- Si existe `end_at`, elimina solo cuando `end_at < now()`.
+- Si no existe `end_at`, elimina solo cuando `start_at` es anterior al comienzo del día actual
+  en `America/Santiago`; conserva un evento sin término durante todo su día local.
+- Requiere `start_at` no nulo y una cronología coherente: `end_at` nulo o mayor o igual al inicio.
+- Conserva cualquier evento suprimido o con al menos una interacción de usuario, positiva o
+  negativa. No distingue entre creación manual y extracción para evaluar el vencimiento.
+- Las categorías asociadas, los medios y la procedencia se eliminan por las cascadas existentes.
+
+La función devuelve el número de eventos borrados y una segunda llamada sin cambios devuelve
+cero. Aplica un bloqueo `SHARE` sobre `user_event_interactions` para impedir que una interacción
+concurrente se pierda durante la comprobación y el borrado. El tiempo de espera de bloqueos se
+limita a cinco segundos. Las inserciones de interacciones pueden esperar mientras dure la
+transacción de publicación; ante contención no resuelta, la operación falla y se revierte.
+
+### Reglas de conciliación por ausencia
+
+Con `SUPABASE_RECONCILE_STALE=true`, la publicación retira filas de las fuentes autorizadas para
+conciliar cuyo `last_seen_at` es anterior a `p_seen_at`. Además exige procedencia en
+`event_provenance`, un método distinto de `manual`, ausencia de supresión y ausencia de
+interacciones. Los eventos manuales no desaparecen por faltar en una página extraída.
+
+Una fuente completa o vacía de forma confirmada puede autorizar esta conciliación; una fuente
+parcial o fallida no la autoriza. Las fuentes retiradas explícitamente en configuración también
+pueden conciliarse. Esta regla es independiente del vencimiento: una ficha ausente puede
+retirarse aunque tuviera fecha futura. Ambas rutas de borrado son parte de la misma transacción;
+si falla cualquier paso, se revierten publicación, relaciones y borrados, y se conserva staging.
 
 ## 9. Consultas útiles
 
@@ -610,7 +686,15 @@ un intervalo seguro de al menos 1,55 segundos entre inicios de solicitudes.
 select id, title, start_at, venue, city, region, is_free
 from public.events
 where status = 'published'
-  and (end_at >= now() or (end_at is null and start_at >= now()))
+  and start_at is not null
+  and not is_suppressed
+  and (end_at is null or end_at >= start_at)
+  and (
+    end_at >= now()
+    or (end_at is null and start_at >=
+      (date_trunc('day', now() at time zone 'America/Santiago')
+        at time zone 'America/Santiago'))
+  )
 order by start_at nulls last;
 ```
 
@@ -647,7 +731,39 @@ order by started_at desc
 limit 20;
 ```
 
-## 10. Limitaciones conocidas
+### Borrados registrados por sincronización
+
+```sql
+select started_at, status, events_count,
+       metadata ->> 'removed_stale' as removed_stale,
+       metadata ->> 'removed_expired' as removed_expired
+from public.scrape_runs
+order by started_at desc
+limit 20;
+```
+
+Esta consulta es administrativa; `scrape_runs` no tiene lectura pública.
+
+## 10. Validación de migraciones
+
+`tools/test_database.sh` instala todas las migraciones ordenadas y ejecuta los archivos SQL de
+`supabase/tests/` sobre una base temporal vacía llamada `eventos_test`. El fixture mínimo de Auth
+simula usuarios y roles para probar el catálogo; no valida el servicio Supabase Auth real. El
+script no lee `.env`. Nunca se debe apuntar a la base de producción.
+
+Las pruebas cubren vencimiento con y sin término, día local chileno, fechas incoherentes,
+supresiones, señales positivas y negativas, cascadas, idempotencia, permisos privados, búsqueda
+por clave/URL, lotes de 1.205 candidatos y rollback de publicación después de un fallo forzado.
+El workflow añade un trabajo `validate` con PostgreSQL 17 temporal y exige su éxito antes de
+ejecutar `scrape`. No aplica migraciones remotas automáticamente en cada ejecución.
+
+El 20 de octubre se verificaron localmente las nueve migraciones y las tres suites SQL en
+PostgreSQL embebido mediante PGlite, con zonas UTC, Santiago y Tokio. Pasaron también las
+144 pruebas de Python, incluida la comprobación de que este diccionario referencia todas las
+migraciones versionadas. Esto no sustituye la primera ejecución del nuevo trabajo en GitHub
+Actions con PostgreSQL 17; su resultado se consulta en el workflow después del push.
+
+## 11. Limitaciones conocidas
 
 - No existe todavía una marca explícita para eventos de día completo.
 - `price_text` no permite comparar precios numéricamente.
@@ -655,9 +771,11 @@ limit 20;
 - Algunos registros de Chile Cultura parecen corresponder a directorios de lugares o guías, no a
   eventos fechados; deben distinguirse en una futura regla de calidad.
 - `Calendar_Month Inscribirse` es una etiqueta inválida conocida.
-- Cada sincronización elimina físicamente los eventos cuyo `end_at` ya pasó. Cuando `end_at` es
-  nulo, se utiliza `start_at`; las relaciones dependientes se eliminan en cascada. Los registros sin
-  inicio válido no entran al catálogo.
+- La limpieza conserva eventos con interacciones para no perder señales del recomendador.
+  Esta protección es temporal: antes de eliminarlos habrá que desacoplar o agregar esas señales.
+  Conservar una fila no implica que esté vigente; el frontend debe filtrar fechas en sus consultas.
+- Las supresiones y las fechas incompletas o incoherentes se conservan para control o revisión;
+  la función no corrige automáticamente fechas erróneas.
 - Con `SUPABASE_RECONCILE_STALE=true`, una fuente `succeeded` o `complete_empty` puede retirar
   registros ausentes. Una fuente `partial` o `failed` nunca autoriza esa limpieza.
 - La publicación pública es transaccional; una carga de staging interrumpida no modifica el catálogo.

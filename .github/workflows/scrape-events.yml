@@ -16,8 +16,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    name: Validar codigo y migraciones SQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: eventos_test
+          POSTGRES_USER: postgres
+          # Credencial ficticia del contenedor efimero, nunca de Supabase.
+          POSTGRES_PASSWORD: ci-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eventos_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias de pruebas
+        run: python -m pip install -r requirements.txt
+
+      - name: Ejecutar pruebas de Python
+        run: python -m unittest discover -s tests -v
+
+      - name: Instalar cliente PostgreSQL
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes postgresql-client
+          fi
+
+      - name: Probar migraciones y limpieza con datos ficticios
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGDATABASE: eventos_test
+          PGUSER: postgres
+          PGPASSWORD: ci-test-only
+        run: bash tools/test_database.sh
+
   scrape:
-    runs-on: ubuntu-latest
+    needs: validate
+    runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
       PYTHONUNBUFFERED: "1"
@@ -59,6 +111,7 @@ jobs:
       SUPABASE_DELETE_EXPIRED: "true"
       SUPABASE_RECONCILE_STALE: "true"
       SUPABASE_TIMEOUT_SECONDS: "60"
+      SUPABASE_BATCH_SIZE: "200"
       SUPABASE_MAX_RETRIES: "3"
       SUPABASE_RETRY_MAX_WAIT_SECONDS: "30"
 
@@ -74,7 +127,7 @@ jobs:
 
       - name: Buscar checkpoint de esta rama y workflow
         id: checkpoint
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const repo = context.repo;
@@ -99,7 +152,7 @@ jobs:
 
       - name: Restaurar estado persistente
         if: steps.checkpoint.outputs.artifact != ''
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           artifact-ids: ${{ steps.checkpoint.outputs.artifact }}
           run-id: ${{ steps.checkpoint.outputs.run }}
@@ -120,7 +173,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Restaurar caché HTTP condicional
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .cache/http
           key: eventos-http-${{ runner.os }}-${{ github.run_id }}
@@ -135,9 +188,6 @@ jobs:
             exit 1
           fi
 
-      - name: Ejecutar pruebas
-        run: python -m unittest discover -s tests -v
-
       - name: Extraer y guardar checkpoints
         timeout-minutes: 240
         run: xvfb-run -a python scrape_events.py --phase extract --local-only
@@ -148,14 +198,14 @@ jobs:
 
       - name: Conservar extracción aunque una fase falle
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: pipeline-state-${{ github.run_id }}-${{ github.run_attempt }}-extract
           path: state-export/pipeline.sqlite3
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Enriquecer pendientes y sincronizar
+      - name: Enriquecer, sincronizar y limpiar eventos vencidos
         timeout-minutes: 80
         run: python scrape_events.py --phase process --supabase
 
@@ -165,7 +215,7 @@ jobs:
 
       - name: Conservar cola y checkpoints al finalizar
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: pipeline-state-${{ github.run_id }}-${{ github.run_attempt }}-final
           path: state-export/pipeline.sqlite3

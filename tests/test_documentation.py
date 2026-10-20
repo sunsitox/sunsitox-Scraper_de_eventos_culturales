@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from docx import Document
+from docx.oxml.ns import qn
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +40,15 @@ def document_signature(path: Path):
 
 
 class DatabaseDocumentationTests(unittest.TestCase):
+    def test_database_reference_lists_every_versioned_migration(self):
+        generator = load_tool("create_database_word")
+        text = generator.SOURCE.read_text(encoding="utf-8")
+        documented = generator.extract_migration_ids(text)
+        actual = [path.name.split("_", 1)[0] for path in sorted(
+            (ROOT / "supabase" / "migrations").glob("*.sql")
+        )]
+        self.assertEqual(documented, actual)
+
     def test_mermaid_er_is_generated_from_the_complete_dbml(self):
         generator = load_tool("generate_model_er")
         tables = generator.parse_dbml(
@@ -77,6 +87,13 @@ class DatabaseDocumentationTests(unittest.TestCase):
                 document_signature(published),
                 document_signature(regenerated),
             )
+            numbering = Document(regenerated).part.numbering_part.element
+            saw_instance = False
+            for child in numbering:
+                if child.tag == qn("w:num"):
+                    saw_instance = True
+                elif child.tag == qn("w:abstractNum"):
+                    self.assertFalse(saw_instance, "Abstract numbering must precede instances")
 
 
 if __name__ == "__main__":

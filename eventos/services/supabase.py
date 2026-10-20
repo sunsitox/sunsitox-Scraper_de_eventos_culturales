@@ -308,12 +308,22 @@ class SupabaseRestClient:
             }
             for event in events
         ]
-        rows = self.rpc("match_existing_events", {"candidates": candidates})
-        return {
-            clean(row.get("local_key")): row
-            for row in rows
-            if clean(row.get("local_key"))
-        }
+        # Cada candidato devuelve como maximo una coincidencia. Limitar las
+        # peticiones evita que PostgREST recorte silenciosamente el resultado
+        # cuando el catalogo supera su limite habitual de 1000 filas.
+        batch_size = min(max(1, self.config.batch_size), 500)
+        matches: dict[str, dict[str, Any]] = {}
+        for start in range(0, len(candidates), batch_size):
+            rows = self.rpc(
+                "match_existing_events",
+                {"candidates": candidates[start : start + batch_size]},
+            )
+            matches.update(
+                (clean(row.get("local_key")), row)
+                for row in rows
+                if clean(row.get("local_key"))
+            )
+        return matches
 
     def delete_in(self, table: str, column: str, values: list[str]) -> None:
         if not values:
@@ -705,6 +715,7 @@ class SupabaseExporter:
         *,
         finished_at: str | None = None,
         error_message: str | None = None,
+        publication: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         metadata = {
             "runner": "github-actions" if os.getenv("GITHUB_ACTIONS") == "true" else "local",
@@ -713,6 +724,11 @@ class SupabaseExporter:
             "git_sha": clean(os.getenv("GITHUB_SHA")) or None,
             "event_name": clean(os.getenv("GITHUB_EVENT_NAME")) or None,
         }
+        if publication is not None:
+            metadata.update(
+                removed_stale=int(publication.get("removed_stale") or 0),
+                removed_expired=int(publication.get("removed_expired") or 0),
+            )
         return {
             "id": run_id,
             "started_at": started_at,
@@ -793,6 +809,7 @@ class SupabaseExporter:
                     "succeeded",
                     len(bundle.events),
                     finished_at=datetime.now(timezone.utc).isoformat(),
+                    publication=publication,
                 )
             ],
         )

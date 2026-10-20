@@ -27,9 +27,11 @@
 \lstset{style=codigo}
 
 \newcommand{\proyecto}{\texttt{Scraper de eventos culturales}}
+\setlength{\emergencystretch}{2em}
 
 \begin{document}
 
+\hypersetup{pageanchor=false}
 \begin{titlepage}
 \centering
 \vspace*{2cm}
@@ -41,13 +43,14 @@ del scraper de eventos culturales de Chile\par}
 \vfill
 \begin{tabular}{rl}
 \textbf{Alcance:} & extracci\'{o}n, normalizaci\'{o}n y sincronizaci\'{o}n del cat\'{a}logo \\
-\textbf{Versi\'{o}n documental:} & septiembre de 2026 \\
+\textbf{Versi\'{o}n documental:} & 20 de octubre de 2026 \\
 \textbf{Tecnolog\'{i}as principales:} & Python, Playwright, NVIDIA NIM, SQLite y Supabase \\
 \textbf{Ejecuci\'{o}n automatizada:} & GitHub Actions \\
 \end{tabular}
 \vfill
 {\color{azul}\rule{\textwidth}{1.4pt}}
 \end{titlepage}
+\hypersetup{pageanchor=true}
 
 \tableofcontents
 \newpage
@@ -74,12 +77,13 @@ No forma parte de este documento el frontend, la autenticaci\'{o}n de usuarios n
   \item \textbf{M\'{i}nima presi\'{o}n sobre los sitios:} se respeta el ritmo por dominio, hay cach\'{e} condicional HTTP y la concurrencia es acotada.
   \item \textbf{Idempotencia:} repetir una ejecuci\'{o}n actualiza registros existentes y evita duplicados mediante identificadores estables y deduplicaci\'{o}n.
   \item \textbf{Resiliencia:} una fuente ca\'{i}da, un afiche ilegible o una respuesta transitoria de NVIDIA no detienen el resto del proceso.
-  \item \textbf{Vigencia:} se eliminan eventos vencidos y registros que una fuente completa ya no publica.
+  \item \textbf{Vigencia:} se retiran eventos vencidos y registros ausentes de fuentes completas, respetando supresiones, interacciones y las protecciones de publicaciones manuales.
 \end{itemize}
 
 \section{Arquitectura general}
 
 \begin{center}
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
   node distance=8mm and 10mm,
   box/.style={draw=azul, rounded corners=3pt, align=center, minimum height=10mm, minimum width=30mm, fill=celeste},
@@ -98,13 +102,14 @@ No forma parte de este documento el frontend, la autenticaci\'{o}n de usuarios n
 \draw[arrow] (connectors) -- (process);
 \draw[arrow] (process) -- (export);
 \draw[arrow] (process) -- (nim);
-\draw[arrow] (nim) -| (process);
+\draw[arrow] (nim.east) -- ++(5mm,0) |- (process.east);
 \draw[arrow] (connectors) -- (state);
 \draw[arrow] (nim) -- (state);
 \draw[arrow] (export) -- (supabase);
 \draw[arrow] (actions) -- (state);
 \draw[arrow] (actions) -- (supabase);
 \end{tikzpicture}
+}
 \end{center}
 
 \subsection{Patrones aplicados}
@@ -125,20 +130,21 @@ Inyecci\'{o}n de dependencias & HTTP, estado, exportador y servicios remotos pue
 \section{Estructura del repositorio}
 
 \begin{lstlisting}
-scrape_events.py              Punto de entrada de la ejecuci\'{o}n
-eventos/                      Paquete de extracci\'{o}n y procesamiento
+scrape_events.py              Punto de entrada de la ejecucion
+eventos/                      Paquete de extraccion y procesamiento
   connectors/                 Estrategias por tipo de fuente
   extractors/                 Lectores reutilizables, por ejemplo JSON-LD
   services/                   NVIDIA NIM y cliente REST de Supabase
-  source_validation/          Pipeline independiente de validaci\'{o}n de fuentes
+  source_validation/          Pipeline independiente de validacion de fuentes
 sources/                      Un JSON por fuente y plantillas reutilizables
-state/                        SQLite local: checkpoint, cola de IA y cach\'{e}
-data/                         Exportaciones JSON, CSV, m\'{e}tricas y auditor\'{i}as
+state/                        SQLite local: checkpoint, cola de IA y cache
+data/                         Exportaciones JSON, CSV, metricas y auditorias
 supabase/migrations/          Migraciones SQL versionadas
+supabase/tests/               Regresiones SQL con datos ficticios
 tools/                        Utilidades, entre ellas copia consistente de estado
-tests/                        Pruebas unitarias y de integraci\'{o}n simulada
-.github/workflows/            Automatizaci\'{o}n en GitHub Actions
-docs/                         Documentaci\'{o}n del scraper
+tests/                        Pruebas unitarias y de integracion simulada
+.github/workflows/            Automatizacion en GitHub Actions
+docs/                         Documentacion del scraper
 \end{lstlisting}
 
 Los directorios \texttt{state/}, \texttt{data/}, cach\'{e}s y el archivo \texttt{.env} son locales y no se publican en Git. Las fuentes, las migraciones, las pruebas y el workflow s\'{i} deben versionarse.
@@ -181,7 +187,7 @@ FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
 
 Cada archivo en \texttt{sources/} declara URL, regi\'{o}n, comuna, organizador, conector, categor\'{i}as por defecto, l\'{i}mites de paginaci\'{o}n y, cuando corresponda, metadatos est\'{a}ticos de ubicaci\'{o}n. A\~{n}adir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea c\'{o}digo nuevo cuando la estructura no coincide con ninguno.
 
-Las fuentes retiradas se declaran en \texttt{settings.json} mediante \texttt{retired\_source\_names}. Durante la siguiente publicaci\'{o}n se reconcilian de forma intencional para eliminar solamente sus eventos remotos. Esto evita que una fuente eliminada de \texttt{sources/} deje registros hu\'{e}rfanos en Supabase.
+Las fuentes retiradas se declaran en \texttt{settings.json} mediante \texttt{retired\_source\_names}. Durante la siguiente publicaci\'{o}n se concilian intencionalmente sus eventos extra\'{i}dos con procedencia acreditada. Se conservan publicaciones manuales, eventos suprimidos y eventos con interacciones, aunque pertenezcan a esas fuentes.
 
 \subsection{Validaci\'{o}n de candidatas}
 
@@ -259,6 +265,8 @@ El l\'{i}mite global se configura en 40 solicitudes por minuto. Todas las llamad
 
 Antes de usar IA, Supabase compara URL original y una clave combinada de t\'{i}tulo, fecha y lugar. Si el evento ya existe y no cambi\'{o}, se reutilizan OCR y texto editorial previamente almacenados. Esta deduplicaci\'{o}n reduce costo, tiempo y consumo de cuota.
 
+La RPC privada \texttt{match\_existing\_events(jsonb)} busca por clave externa, URL de extracci\'{o}n o URL oficial. Desde la revisi\'{o}n del 20 de octubre utiliza dos \'{i}ndices B-tree de URL normalizada y ramas de igualdad separadas. Conserva la coincidencia m\'{a}s reciente por clave local y resuelve empates por identificador. El cliente divide las consultas en lotes de entre 1 y 500 candidatos; el workflow utiliza 200. Esto evita respuestas masivas que puedan truncarse por el l\'{i}mite de filas de PostgREST, sin aumentar el l\'{i}mite de NVIDIA.
+
 \section{Estado local, checkpoints y recuperaci\'{o}n}
 
 El archivo \texttt{state/pipeline.sqlite3} conserva datos operativos, no el cat\'{a}logo p\'{u}blico. Incluye checkpoints por fuente, una extracci\'{o}n consolidada, cola de enriquecimiento, cach\'{e} de resultados de IA, m\'{e}tricas y cach\'{e} HTTP condicional.
@@ -275,13 +283,33 @@ La sincronizaci\'{o}n remota usa la API REST de Supabase con una clave secreta e
 \begin{enumerate}
   \item transformar eventos en entidades normalizadas: fuentes, organizadores, comunas, categor\'{i}as, eventos, procedencia y medios;
   \item cargar fragmentos en la tabla privada \texttt{catalog\_staging};
-  \item ejecutar una RPC transaccional que publica todo el lote o no publica nada;
-  \item eliminar eventos vencidos y filas no vistas por fuentes cuya extracci\'{o}n termin\'{o} correctamente.
+  \item ejecutar \texttt{publish\_staged\_catalog(...)} para publicar todo el lote dentro de una transacci\'{o}n;
+  \item conciliar ausencias e invocar \texttt{cleanup\_expired\_events()} dentro de esa misma transacci\'{o}n, si la limpieza est\'{a} habilitada;
+  \item registrar el resultado de sincronizaci\'{o}n en \texttt{scrape\_runs}.
 \end{enumerate}
 
 Las consultas y cargas REST idempotentes reintentan fallas transitorias de red, timeout o disponibilidad temporal. La RPC de publicaci\'{o}n no se repite autom\'{a}ticamente si su respuesta se pierde, porque podr\'{i}a haber finalizado y eliminado el staging; as\'{i} se evita una publicaci\'{o}n ambigua o duplicada.
 
 Los organizadores bloqueados y los eventos suprimidos individualmente se excluyen antes de OCR, redacci\'{o}n y publicaci\'{o}n. De este modo, una solicitud de retiro no se revierte en la siguiente ejecuci\'{o}n.
+
+\subsection{Limpieza protegida y conciliaci\'{o}n}
+
+\texttt{cleanup\_expired\_events()} es una funci\'{o}n PostgreSQL privada que devuelve un \texttt{bigint}; no es un trigger ni un procedimiento invocable con \texttt{CALL}. Usa \texttt{now()} del servidor al inicio de la transacci\'{o}n. Eval\'{u}a tanto eventos manuales como extra\'{i}dos:
+\begin{itemize}
+  \item con \texttt{end\_at}, elimina cuando el t\'{e}rmino es estrictamente anterior al reloj del servidor;
+  \item sin \texttt{end\_at}, elimina cuando el inicio es anterior al comienzo del d\'{i}a actual en \texttt{America/Santiago}; conserva todo el d\'{i}a local de inicio;
+  \item conserva eventos suprimidos o con cualquier interacci\'{o}n de usuario, sea positiva o negativa;
+  \item conserva fechas sin inicio o con t\'{e}rmino anterior al inicio, para revisi\'{o}n;
+  \item elimina por cascada las relaciones de categor\'{i}as, medios y procedencia del evento retirado.
+\end{itemize}
+
+La conciliaci\'{o}n por ausencia es otra regla: requiere una fuente autorizada, una fila no vista en la sincronizaci\'{o}n actual, procedencia en \texttt{event\_provenance} y un m\'{e}todo distinto de \texttt{manual}. Tambi\'{e}n protege supresiones e interacciones. Puede retirar una ficha con fecha futura si ya no aparece en una fuente completa; una fuente fallida o parcial no autoriza esa conciliaci\'{o}n.
+
+Las dos rutas utilizan un bloqueo \texttt{SHARE} de \texttt{user\_event\_interactions} para evitar perder se\~{n}ales concurrentes; el tiempo de espera de bloqueos se limita a cinco segundos. Una falla revierte publicaci\'{o}n, relaciones y borrados, manteniendo staging. Las inserciones de interacciones pueden esperar durante esta transacci\'{o}n.
+
+La publicaci\'{o}n devuelve \texttt{removed\_stale} y \texttt{removed\_expired}. El exportador guarda esos contadores en \texttt{scrape\_runs.metadata} cuando marca el \'{e}xito. No son el total restante del cat\'{a}logo. La escritura final de la bit\'{a}cora ocurre despu\'{e}s de la RPC y no revierte una publicaci\'{o}n ya confirmada si falla.
+
+La conservaci\'{o}n de eventos con interacciones es temporal, hasta desacoplar las se\~{n}ales del recomendador. El frontend debe seguir filtrando las fechas: una fila conservada por protecci\'{o}n no necesariamente representa un evento vigente. Las RPC de limpieza y publicaci\'{o}n solo admiten ejecuci\'{o}n con \texttt{service\_role}; \texttt{anon} y \texttt{authenticated} no tienen ese permiso.
 
 \section{Configuraci\'{o}n}
 
@@ -308,32 +336,51 @@ Los par\'{a}metros operativos m\'{a}s relevantes son:
 \texttt{NVIDIA\_REWRITE\_ENABLED} & Activa o desactiva la redacci\'{o}n editorial. \\
 \texttt{SUPABASE\_DELETE\_EXPIRED} & Elimina eventos ya terminados al sincronizar. \\
 \texttt{SUPABASE\_RECONCILE\_STALE} & Retira eventos no vistos por fuentes completas. \\
+\texttt{SUPABASE\_BATCH\_SIZE} & Fragmentos REST; 200 en el workflow. La consulta de coincidencias limita sus lotes a 500 como m\'{a}ximo. \\
 \texttt{SUPABASE\_MAX\_RETRIES} & Reintentos de operaciones REST idempotentes ante fallas transitorias. \\
-\texttt{SUPABASE\_RETRY\_MAX\_WAIT\_SECONDS} & Espera m\'{a}xima entre reintentos REST. \\
+\path|SUPABASE_RETRY_MAX_WAIT_SECONDS| & Espera m\'{a}xima entre reintentos REST. \\
 \bottomrule
 \end{longtable}
 
 \section{Automatizaci\'{o}n con GitHub Actions}
 
-El workflow instala dependencias, Chromium para Playwright, ejecuta las pruebas, restaura checkpoints, extrae, conserva un artefacto, enriquece y sincroniza. Las credenciales se almacenan como \textit{Repository secrets}: \texttt{SUPABASE\_URL}, \texttt{SUPABASE\_SECRET\_KEY} y \texttt{NVIDIA\_API\_KEY}.
+El workflow separa validaci\'{o}n y ejecuci\'{o}n en dos trabajos sobre \texttt{ubuntu-24.04}. El trabajo \texttt{validate} instala dependencias, ejecuta las pruebas de Python y utiliza PostgreSQL 17 temporal para aplicar todas las migraciones y probar las regresiones SQL. El contenedor existe \'{u}nicamente en GitHub Actions: no requiere instalar Docker en el computador local ni contenerizar el scraper.
 
-La programaci\'{o}n vigente es diaria a las 00:15 en la zona \texttt{America/Santiago}. El workflow conserva tambi\'{e}n \texttt{workflow\_dispatch}, por lo que puede iniciarse manualmente desde la pesta\~{n}a Actions. La zona horaria evita tener que ajustar el cron por horario de verano.
+El trabajo \texttt{scrape} depende del \'{e}xito de \texttt{validate}. Instala Chromium, restaura checkpoints, extrae, conserva un artefacto, enriquece y sincroniza con limpieza protegida. Conserva las copias de estado al finalizar aunque una fase falle. Las credenciales se almacenan como \textit{Repository secrets}: \texttt{SUPABASE\_URL}, \texttt{SUPABASE\_SECRET\_KEY} y \texttt{NVIDIA\_API\_KEY}. La validaci\'{o}n SQL no utiliza estas claves.
+
+La programaci\'{o}n vigente es diaria a las 23:37 en la zona \texttt{America/Santiago}, mediante \texttt{37 23 * * *}. El workflow conserva \texttt{workflow\_dispatch} para ejecuci\'{o}n manual. La zona horaria evita ajustar el cron por horario de verano; el programador de GitHub puede retrasar el inicio. Las migraciones remotas se aplican por separado y no en cada ejecuci\'{o}n programada.
+
+\subsection{Pruebas de base de datos}
+
+\texttt{tools/test\_database.sh} exige una base vac\'{i}a llamada \texttt{eventos\_test}, instala un contrato m\'{i}nimo ficticio de Auth y aplica las migraciones ordenadas antes de ejecutar \texttt{supabase/tests/*.sql}. No lee \texttt{.env} y nunca debe apuntar al proyecto de producci\'{o}n. El fixture comprueba el comportamiento del cat\'{a}logo, no el servicio real de autenticaci\'{o}n.
+
+Las regresiones cubren vencimiento, d\'{i}a chileno, fechas incoherentes, supresiones, interacciones, cascadas, permisos, idempotencia, coincidencias por clave/URL y rollback de publicaci\'{o}n ante un fallo forzado. El 20 de octubre pasaron las 144 pruebas de Python, incluida la comprobaci\'{o}n de cobertura documental de migraciones, y las tres suites SQL locales sobre PostgreSQL embebido con PGlite, en UTC, Santiago y Tokio. La ejecuci\'{o}n del nuevo trabajo con PostgreSQL 17 en Actions se verifica despu\'{e}s de subir el cambio; no se presenta como una prueba remota ya realizada.
+
+\subsection{Cambios del 20 de octubre de 2026}
+
+\begin{itemize}
+  \item \texttt{20261020000100}: crea \texttt{cleanup\_expired\_events()} y restringe su ejecuci\'{o}n al proceso de ingesta.
+  \item \texttt{20261020000200}: incorpora \'{i}ndices para URL de origen y oficial. Optimiza \path|match_existing_events(jsonb)| sin modificar su firma.
+  \item \texttt{20261020000300}: conecta la limpieza protegida con la publicaci\'{o}n at\'{o}mica y protege las publicaciones manuales frente a la conciliaci\'{o}n.
+\end{itemize}
+
+Las nueve migraciones locales y remotas quedaron sincronizadas. Su instalaci\'{o}n no ejecut\'{o} el scraper ni elimin\'{o} eventos; el nuevo comportamiento opera en la siguiente publicaci\'{o}n correcta. No se a\~{n}adieron tablas, columnas ni relaciones, por lo que el modelo ER permanece vigente.
 
 \section{Operaci\'{o}n y mantenimiento}
 
 \subsection{Comandos frecuentes}
 
 \begin{lstlisting}
-# Instalaci\'{o}n en Windows
+# Instalacion en Windows
 instalar.bat
 
-# Ejecuci\'{o}n completa local
+# Ejecucion completa local
 ejecutar.bat
 
 # Pruebas
 python -m unittest discover -s tests -v
 
-# Solo extracci\'{o}n, sin IA ni Supabase
+# Solo extraccion, sin IA ni Supabase
 python scrape_events.py --phase extract --local-only
 
 # Procesar un checkpoint y sincronizar

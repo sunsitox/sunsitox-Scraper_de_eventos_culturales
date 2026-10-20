@@ -334,7 +334,13 @@ def add_numbering_definition(document: Document, kind: str) -> int:
     p_pr.extend([tabs, indent, spacing])
     lvl.extend([start, fmt, lvl_text, justification, p_pr])
     abstract.append(lvl)
-    numbering.append(abstract)
+    # OOXML exige todas las definiciones abstractas antes de las instancias.
+    # Word puede reparar un orden invalido convirtiendo las vinetas en numeros.
+    first_num = numbering.find(qn("w:num"))
+    if first_num is not None:
+        numbering.insert(numbering.index(first_num), abstract)
+    else:
+        numbering.append(abstract)
 
     num = OxmlElement("w:num")
     num.set(qn("w:numId"), str(num_id))
@@ -499,6 +505,8 @@ def parse_markdown_table(lines: list[str]) -> list[list[str]]:
 def choose_widths(headers: list[str]) -> list[int]:
     count = len(headers)
     normalized = [h.lower() for h in headers]
+    if normalized == ["migración", "cambio", "efecto al instalar"]:
+        return [1700, 4500, 3160]
     if count == 4 and "columna" in normalized:
         return [1800, 1400, 1800, 4360]
     if count == 3 and "eventos observados" in normalized:
@@ -677,6 +685,8 @@ def build_document() -> None:
             add_inline(paragraph, item[2:])
             continue
         elif re.match(r"^\d+\. ", stripped):
+            if stripped.startswith("1. "):
+                decimal_num_id = add_numbering_definition(doc, "decimal")
             item, index = collect_wrapped_lines(lines, index)
             paragraph = doc.add_paragraph()
             apply_numbering(paragraph, decimal_num_id)

@@ -43,7 +43,7 @@ del scraper de eventos culturales de Chile\par}
 \vfill
 \begin{tabular}{rl}
 \textbf{Alcance:} & extracci\'{o}n, normalizaci\'{o}n y sincronizaci\'{o}n del cat\'{a}logo \\
-\textbf{Versi\'{o}n documental:} & 20 de octubre de 2026 \\
+\textbf{Versi\'{o}n documental:} & 27 de octubre de 2026 \\
 \textbf{Tecnolog\'{i}as principales:} & Python, Playwright, NVIDIA NIM, SQLite y Supabase \\
 \textbf{Ejecuci\'{o}n automatizada:} & GitHub Actions \\
 \end{tabular}
@@ -149,9 +149,10 @@ docs/                         Documentacion del scraper
 
 Los directorios \texttt{state/}, \texttt{data/}, cach\'{e}s y el archivo \texttt{.env} son locales y no se publican en Git. Las fuentes, las migraciones, las pruebas y el workflow s\'{i} deben versionarse.
 
+\clearpage
 \section{Fuentes de datos}
 
-La configuraci\'{o}n vigente contiene 21 fuentes permanentes y una fuente estacional, activa \'{u}nicamente en septiembre. Chile Cultura y Ticketplus aportan alcance nacional; las dem\'{a}s agregan profundidad territorial o tem\'{a}tica.
+La configuraci\'{o}n vigente contiene 26 fuentes permanentes y una fuente estacional, activa \'{u}nicamente en septiembre: 27 configuraciones. Chile Cultura y Ticketplus aportan alcance nacional; las dem\'{a}s agregan profundidad territorial o tem\'{a}tica.
 
 \small
 \begin{longtable}{p{0.38\textwidth}p{0.24\textwidth}p{0.30\textwidth}}
@@ -172,6 +173,11 @@ Teatro Biob\'{i}o & Biob\'{i}o & WordPress REST y fechas visibles \\
 Agenda Universidad de Talca & Maule & Tarjetas HTML declarativas \\
 Corporaci\'{o}n Cultural de Iquique & Tarapac\'{a} & Tarjetas institucionales \\
 Centro de Arte Molino Machmar & Los Lagos & Tarjetas institucionales \\
+Teatro del Lago & Los Lagos, Frutillar & The Events Calendar API \\
+Teatro Municipal de Chill\'{a}n & \~{N}uble & Cartelera y fichas con a\~{n}o expl\'{i}cito \\
+Teatro Regional Cervantes & Los R\'{i}os & Tarjetas con fecha completa \\
+Corporaci\'{o}n Cultural de Puerto Montt & Los Lagos & Cartelera m\'{o}vil y fichas \\
+Teatro Oriente & Providencia & Cartelera HTML y JSON-LD \\
 Enoturismo Chile & Interregional & WordPress/EventON \\
 FISA & Varias regiones & Portafolio oficial \\
 Espacio Riesco & Regi\'{o}n Metropolitana & Tarjetas HTML declarativas \\
@@ -186,6 +192,10 @@ FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
 \normalsize
 
 Cada archivo en \texttt{sources/} declara URL, regi\'{o}n, comuna, organizador, conector, categor\'{i}as por defecto, l\'{i}mites de paginaci\'{o}n y, cuando corresponda, metadatos est\'{a}ticos de ubicaci\'{o}n. A\~{n}adir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea c\'{o}digo nuevo cuando la estructura no coincide con ninguno.
+
+Las cinco incorporaciones del 27 de octubre de 2026 se comprobaron mediante extracci\'{o}n local de solo lectura, sin NVIDIA ni Supabase. Entregaron 43 fichas vigentes antes de deduplicar contra el cat\'{a}logo: Lago 7, Chill\'{a}n 5, Cervantes 18, Puerto Montt 4 y Oriente 9. Son observaciones de esa prueba, no conteos permanentes ni una garant\'{i}a de acceso desde GitHub Actions. Puerto Montt publica una ventana m\'{o}vil de 30 d\'{i}as: no se afirma cubrir todo su archivo. Chill\'{a}n utiliza el a\~{n}o expl\'{i}cito de la ficha; Oriente utiliza fechas ISO del JSON-LD y excluye cancelaciones y avisos permanentes.
+
+El conector de tarjetas admite selectores de detalle, campos JSON-LD y enlaces de paginaci\'{o}n configurables. Los detalles fallidos temporalmente, la p\'{e}rdida de campos obligatorios y los ciclos de paginaci\'{o}n marcan una extracci\'{o}n parcial, que no autoriza borrados por ausencia. Esta ampliaci\'{o}n est\'{a} documentada en los JSON ejecutables y \texttt{docs/SOURCES.md}; no modifica los resultados hist\'{o}ricos del inventario Excel.
 
 Las fuentes retiradas se declaran en \texttt{settings.json} mediante \texttt{retired\_source\_names}. Durante la siguiente publicaci\'{o}n se concilian intencionalmente sus eventos extra\'{i}dos con procedencia acreditada. Se conservan publicaciones manuales, eventos suprimidos y eventos con interacciones, aunque pertenezcan a esas fuentes.
 
@@ -254,14 +264,31 @@ El filtro cultural funciona despu\'{e}s de sanear y consolidar, antes de exporta
 
 \section{IA, OCR y control de cuota}
 
-NVIDIA NIM se usa como respaldo, no como requisito de extracci\'{o}n. Las fuentes con API, JSON-LD, WordPress REST o tarjetas declarativas se procesan sin consumir IA. La IA interviene \'{u}nicamente en estos casos:
+NVIDIA NIM se usa como respaldo, no como requisito de extracci\'{o}n. Las fichas de fuentes con API, JSON-LD, WordPress REST o tarjetas declarativas se leen sin IA, pero sus eventos nuevos o modificados pueden necesitar enriquecimiento posterior. La IA interviene en estos casos:
 \begin{itemize}
-  \item OCR de afiches cuando existe imagen y no hay texto suficiente;
+  \item respaldo de extracci\'{o}n sem\'{a}ntica cuando un conector gen\'{e}rico no encuentra datos estructurados y tiene habilitado ese respaldo;
+  \item OCR de afiches con imagen cuyo resultado est\'{a} ausente, pendiente o vencido en cach\'{e}; no depende de que la descripci\'{o}n HTML est\'{e} vac\'{i}a;
   \item redacci\'{o}n editorial de texto p\'{u}blico, preservando el texto de origen para trazabilidad;
   \item resoluci\'{o}n por lotes de ubicaciones incompletas.
 \end{itemize}
 
 El l\'{i}mite global se configura en 40 solicitudes por minuto. Todas las llamadas, incluso las iniciadas por fuentes concurrentes, pasan por el mismo regulador. Las respuestas 429, \texttt{Retry-After} y secuencias de timeouts activan pausas controladas; los pendientes no se pierden, sino que pasan a una cola SQLite para una ejecuci\'{o}n futura.
+
+\subsection{Presupuestos y suspensi\'{o}n controlada}
+
+El timeout de red no es el presupuesto de toda una fase. El OCR tiene, por defecto, 45 segundos de timeout por solicitud, un reintento y hasta 100 segundos de presupuesto por operaci\'{o}n. La etapa admite hasta 100 im\'{a}genes, pero dispone adem\'{a}s de un presupuesto acumulado de 20 minutos. La redacci\'{o}n dispone de otros 20 minutos y la ubicaci\'{o}n de 5 minutos. El tiempo restante recorta la espera y los reintentos de la siguiente operaci\'{o}n.
+
+Cada etapa se suspende despu\'{e}s de tres operaciones consecutivas sin resultado v\'{a}lido. Un resultado v\'{a}lido reinicia el contador; no se cuenta simplemente el total de errores de toda la corrida. En redacci\'{o}n y ubicaci\'{o}n, un lote con resultados v\'{a}lidos parciales conserva los completados y deja el resto pendiente. La suspensi\'{o}n no desactiva autom\'{a}ticamente todas las etapas de IA ni descarta eventos que ya sean v\'{a}lidos.
+
+Los presupuestos suman 45 minutos nominales y reservan margen dentro de los 80 minutos del paso de procesamiento en Actions. No son una garant\'{i}a estricta de duraci\'{o}n ante bloqueos de red o de Supabase. El l\'{i}mite RPM sigue vigente; no se alternan cuentas ni claves para aumentarlo. Las respuestas HTTP 401, 403 y 410 constituyen una indisponibilidad permanente para esa ejecuci\'{o}n y desactivan el respaldo IA global, a diferencia de la suspensi\'{o}n de una sola etapa.
+
+\subsection{Validaci\'{o}n de respuestas y diagn\'{o}stico}
+
+Las solicitudes piden una respuesta sin streaming. Se comprueban por separado la envoltura JSON HTTP, el texto devuelto por el modelo y los campos requeridos. En OCR y redacci\'{o}n se admiten cercos Markdown, pre\'{a}mbulos y una lista unitaria que contenga el objeto esperado; no se inventan campos ni se recuperan subobjetos de estructuras truncadas. Una respuesta marcada como incompleta o filtrada se rechaza antes de actualizar el evento.
+
+Los errores de envoltura informan estado HTTP, tipo de contenido y tama\~{n}o, sin imprimir el cuerpo ni las credenciales. Un \texttt{Read timed out} no demuestra agotamiento de cuota: la evidencia de l\'{i}mite RPM es HTTP 429. La URL cultural identifica el evento afectado; el host del error identifica el servicio con el que fall\'{o} la comunicaci\'{o}n.
+
+El mensaje de suspensi\'{o}n del OCR indica el resto del lote seleccionado, no el tama\~{n}o total de la cola. Una publicaci\'{o}n correcta en Supabase puede coexistir con enriquecimientos pendientes. La suspensi\'{o}n permite continuar hasta la sincronizaci\'{o}n, pero no convierte un fallo real de Supabase en un \'{e}xito ni garantiza la calidad de informaci\'{o}n que no pudo leerse.
 
 Antes de usar IA, Supabase compara URL original y una clave combinada de t\'{i}tulo, fecha y lugar. Si el evento ya existe y no cambi\'{o}, se reutilizan OCR y texto editorial previamente almacenados. Esta deduplicaci\'{o}n reduce costo, tiempo y consumo de cuota.
 
@@ -269,9 +296,11 @@ La RPC privada \texttt{match\_existing\_events(jsonb)} busca por clave externa, 
 
 \section{Estado local, checkpoints y recuperaci\'{o}n}
 
-El archivo \texttt{state/pipeline.sqlite3} conserva datos operativos, no el cat\'{a}logo p\'{u}blico. Incluye checkpoints por fuente, una extracci\'{o}n consolidada, cola de enriquecimiento, cach\'{e} de resultados de IA, m\'{e}tricas y cach\'{e} HTTP condicional.
+El archivo \texttt{state/pipeline.sqlite3} conserva datos operativos, no el cat\'{a}logo p\'{u}blico. Incluye checkpoints por fuente, una extracci\'{o}n consolidada, cola de enriquecimiento, cach\'{e} de resultados de IA y de detalles, y el enfriamiento pendiente de NVIDIA. La cach\'{e} HTTP condicional se almacena separadamente en \texttt{.cache/http/}; no debe confundirse con la cola SQLite.
 
 En GitHub Actions, el estado se guarda como artefacto despu\'{e}s de la extracci\'{o}n y nuevamente al finalizar. Una ejecuci\'{o}n siguiente restaura el \'{u}ltimo artefacto disponible. Por ello, si falla la fase de enriquecimiento, no se requiere volver a recorrer todas las p\'{a}ginas: la siguiente corrida retoma los eventos y pendientes conservados.
+
+Las tareas pueden estar pendientes, en proceso, completadas o con error reintentable. Las completadas se reutilizan mientras su entrada y cach\'{e} sigan siendo compatibles. Una corrida terminada inicia un nuevo ciclo de revisi\'{o}n en la siguiente ejecuci\'{o}n; no congela indefinidamente el listado de fuentes. Cambiar los JSON, como al incorporar las cinco fuentes nuevas, invalida la compatibilidad de la extracci\'{o}n consolidada anterior: debe ejecutarse primero la fase de extracci\'{o}n. El workflow ya sigue ese orden. El OCR pendiente solo puede retomarse si se conserva/restaura el estado y el evento sigue siendo elegible.
 
 No deben ejecutarse simult\'{a}neamente dos procesos que compartan el mismo estado local o las mismas credenciales de IA. El workflow usa un grupo de concurrencia para impedir que dos ejecuciones programadas se solapen.
 
@@ -333,6 +362,12 @@ Los par\'{a}metros operativos m\'{a}s relevantes son:
 \texttt{HTTP\_CACHE\_ENABLED} & Activa revalidaci\'{o}n condicional mediante ETag y Last-Modified. \\
 \texttt{NVIDIA\_RPM\_LIMIT} & L\'{i}mite global de solicitudes a NVIDIA; configurado en 40. \\
 \texttt{NVIDIA\_OCR\_MAX\_IMAGES} & M\'{a}ximo de afiches OCR por ejecuci\'{o}n. \\
+\path|NVIDIA_OCR_STAGE_BUDGET_SECONDS| & Presupuesto acumulado OCR; 1200 segundos (20 minutos). \\
+\path|NVIDIA_REWRITE_STAGE_BUDGET_SECONDS| & Presupuesto acumulado de redacci\'{o}n; 1200 segundos. \\
+\path|NVIDIA_LOCATION_STAGE_BUDGET_SECONDS| & Presupuesto acumulado de ubicaci\'{o}n; 300 segundos. \\
+\path|NVIDIA_OCR_FAILURE_THRESHOLD| & Corte tras operaciones OCR fallidas consecutivas; 3 por defecto. \\
+\path|NVIDIA_REWRITE_FAILURE_THRESHOLD| & Umbral equivalente para lotes de redacci\'{o}n; 3 por defecto. \\
+\path|NVIDIA_LOCATION_FAILURE_THRESHOLD| & Umbral equivalente para lotes de ubicaci\'{o}n; 3 por defecto. \\
 \texttt{NVIDIA\_REWRITE\_ENABLED} & Activa o desactiva la redacci\'{o}n editorial. \\
 \texttt{SUPABASE\_DELETE\_EXPIRED} & Elimina eventos ya terminados al sincronizar. \\
 \texttt{SUPABASE\_RECONCILE\_STALE} & Retira eventos no vistos por fuentes completas. \\
@@ -347,6 +382,8 @@ Los par\'{a}metros operativos m\'{a}s relevantes son:
 El workflow separa validaci\'{o}n y ejecuci\'{o}n en dos trabajos sobre \texttt{ubuntu-24.04}. El trabajo \texttt{validate} instala dependencias, ejecuta las pruebas de Python y utiliza PostgreSQL 17 temporal para aplicar todas las migraciones y probar las regresiones SQL. El contenedor existe \'{u}nicamente en GitHub Actions: no requiere instalar Docker en el computador local ni contenerizar el scraper.
 
 El trabajo \texttt{scrape} depende del \'{e}xito de \texttt{validate}. Instala Chromium, restaura checkpoints, extrae, conserva un artefacto, enriquece y sincroniza con limpieza protegida. Conserva las copias de estado al finalizar aunque una fase falle. Las credenciales se almacenan como \textit{Repository secrets}: \texttt{SUPABASE\_URL}, \texttt{SUPABASE\_SECRET\_KEY} y \texttt{NVIDIA\_API\_KEY}. La validaci\'{o}n SQL no utiliza estas claves.
+
+El resumen de duraci\'{o}n pertenece al comando que lo genera. Como extracci\'{o}n y procesamiento se ejecutan por separado, el tiempo de una fase no equivale al tiempo completo del workflow. El total de eventos sincronizados tampoco representa necesariamente todas las filas existentes en Supabase: pueden conservarse publicaciones manuales, supresiones o registros protegidos por interacciones.
 
 La programaci\'{o}n vigente es diaria a las 23:37 en la zona \texttt{America/Santiago}, mediante \texttt{37 23 * * *}. El workflow conserva \texttt{workflow\_dispatch} para ejecuci\'{o}n manual. La zona horaria evita ajustar el cron por horario de verano; el programador de GitHub puede retrasar el inicio. Las migraciones remotas se aplican por separado y no en cada ejecuci\'{o}n programada.
 
@@ -364,7 +401,11 @@ Las regresiones cubren vencimiento, d\'{i}a chileno, fechas incoherentes, supres
   \item \texttt{20261020000300}: conecta la limpieza protegida con la publicaci\'{o}n at\'{o}mica y protege las publicaciones manuales frente a la conciliaci\'{o}n.
 \end{itemize}
 
-Las nueve migraciones locales y remotas quedaron sincronizadas. Su instalaci\'{o}n no ejecut\'{o} el scraper ni elimin\'{o} eventos; el nuevo comportamiento opera en la siguiente publicaci\'{o}n correcta. No se a\~{n}adieron tablas, columnas ni relaciones, por lo que el modelo ER permanece vigente.
+En esa revisi\'{o}n del 20 de octubre, las nueve migraciones del scraper quedaron sincronizadas. Su instalaci\'{o}n no ejecut\'{o} el scraper ni elimin\'{o} eventos. Esa revisi\'{o}n no a\~{n}adi\'{o} tablas, columnas ni relaciones; no describe migraciones posteriores de autenticaci\'{o}n ajenas al alcance de este manual.
+
+\subsection{Revisi\'{o}n del 27 de octubre de 2026}
+
+Se incorporaron las cinco fuentes descritas en la secci\'{o}n de fuentes y se reforz\'{o} el conector de tarjetas con lectura de detalles, fechas completas, JSON-LD y paginaci\'{o}n segura. Se mantuvieron los checkpoints y los presupuestos por etapa de IA. Las 178 pruebas de Python pasaron localmente, incluidos los casos de suspensi\'{o}n OCR, continuidad hacia el exportador simulado, recuperaci\'{o}n de pendientes, estructuras de las nuevas agendas y coherencia documental de fuentes y presupuestos. La prueba real de las cinco fuentes no utiliz\'{o} NVIDIA ni sincroniz\'{o} Supabase. No se afirma una ejecuci\'{o}n integral nueva en producci\'{o}n por haber pasado estas pruebas.
 
 \section{Operaci\'{o}n y mantenimiento}
 

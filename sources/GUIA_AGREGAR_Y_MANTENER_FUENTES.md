@@ -208,6 +208,31 @@ Prefiere selectores semánticos y cortos, como `article.evento` o
 `:nth-child(3)`, clases generadas automáticamente o cadenas completas de la
 jerarquía visual: suelen romperse con cambios menores de diseño.
 
+### Fechas completas, detalle y paginación
+
+Cuando una tarjeta resume la fecha pero la ficha publica el año, configura `detail_selectors`
+con el mismo formato que `selectors`, y `detail_required_fields: ["start_date"]`. La fecha del
+detalle tiene prioridad. No uses el campo `date` de WordPress: es la fecha de publicación.
+Si el detalle contiene un único evento JSON-LD, `detail_jsonld_fields` puede indicar campos
+canónicos que se recuperarán de él, por ejemplo `["start_date", "end_date", "image_url"]`.
+El ejemplo completo está en `teatro-municipal-chillan.json` y `teatro-oriente.json`.
+
+Un selector de atributo/texto admite opcionalmente `pattern` (primer grupo capturado, o la
+coincidencia completa si no hay grupos) y `format: "time"`. Este último convierte horas
+explícitas como `19 hrs.` a `19:00` y rechaza horas fuera de rango; no inventa una hora ausente.
+`exclude_card_pattern` descarta tarjetas que indiquen cancelación u otros contenidos excluidos
+de manera explícita por esa configuración.
+
+Para seguir enlaces públicos de paginación, declara `next_page_selector`, por ejemplo
+`a.next.page-numbers`. `max_pages: 0` no impone un recorte. Los ciclos, errores en páginas
+posteriores, fechas obligatorias ausentes y detalles temporalmente inaccesibles marcan la
+fuente como parcial: se conservan resultados válidos, pero no se concilia por ausencia.
+Un 404/410 en una ficha no representa por sí solo una caída de toda la fuente. Los enlaces de
+detalle y de paginación deben permanecer en el mismo dominio; no se siguen enlaces externos.
+
+Si el sitio ofrece solo una ventana móvil de programación (como los próximos 30 días de Puerto
+Montt), documenta esa cobertura en `integration_note`; no la presentes como todo el archivo.
+
 ## 7. Cuándo crear un conector Python
 
 Crea un archivo en `eventos/connectors/` solamente si la fuente requiere lógica

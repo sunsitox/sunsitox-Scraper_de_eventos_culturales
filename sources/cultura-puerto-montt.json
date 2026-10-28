@@ -1,0 +1,38 @@
+{
+  "name": "Corporación Cultural de Puerto Montt",
+  "url": "https://culturapuertomontt.cl/cartelera/",
+  "connector": "html_cards",
+  "region": "Región de los Lagos",
+  "commune": "Puerto Montt",
+  "city": "Puerto Montt",
+  "organizer": "",
+  "default_categories": ["Cultura"],
+  "card_selector": ".e-loop-item.type-evento",
+  "date_range_parser": "spanish_abbreviated",
+  "selectors": {
+    "title": ".ccpm-tarjeta__titulo h3",
+    "date_range": ".ccpm-tarjeta__fecha",
+    "start_time": {"selector": ".ccpm-tarjeta__meta span:first-child", "pattern": "(\\d{1,2}:\\d{2})", "format": "time"},
+    "venue": ".ccpm-tarjeta__meta span:last-child",
+    "category": ".ccpm-tarjeta__area",
+    "price": ".ccpm-tarjeta__valor",
+    "source_url": {"selector": ".ccpm-tarjeta__titulo a", "attribute": "href"}
+  },
+  "detail_selectors": {
+    "description": ".ccpm-prosa",
+    "image_url": {"selector": "meta[property='og:image']", "attribute": "content"},
+    "organizer": {"selector": ".ccpm-prosa p:-soup-contains('Organiza:')", "pattern": "Organiza:\\s*(.+)"}
+  },
+  "location_metadata": {
+    "Sala Diego Rivera": {"address": "Quillota 116, Puerto Montt", "commune": "Puerto Montt"},
+    "Sala Mafalda Mora": {"address": "Quillota 116, Puerto Montt", "commune": "Puerto Montt"}
+  },
+  "require_start_date": true,
+  "max_results": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_verified_at": "2026-10-27",
+  "integration_note": "La cartelera oficial publica una ventana móvil de los próximos 30 días; el año se resuelve con ese contexto, incluida la transición diciembre/enero. No incluye todo el archivo histórico. Organizador solo cuando la ficha lo identifica expresamente."
+}

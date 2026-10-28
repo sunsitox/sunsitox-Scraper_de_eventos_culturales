@@ -1,6 +1,6 @@
 # Fuentes de datos del agregador de eventos culturales
 
-**Actualización:** 25 de septiembre de 2026
+**Actualización:** 27 de octubre de 2026
 **Cobertura:** las 16 regiones de Chile mediante Chile Cultura, complementadas por agendas
 municipales, culturales, universitarias, vinícolas y de exposiciones.
 
@@ -35,6 +35,11 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
 | [Ticketplus · Chile](https://ticketplus.cl/states/region-metropolitana) | Carteleras de las 16 regiones | Selector regional público, fichas estructuradas y filtro cultural global |
 | [Corporación Cultural de Iquique](https://culturaiquique.cl/) | Programación cultural de Tarapacá | Tarjetas institucionales con fechas, categorías y fichas oficiales |
 | [Centro de Arte Molino Machmar](https://www.molinomachmar.cl/cartelera/) | Artes visuales, música, literatura y artes escénicas en Puerto Varas | Tarjetas institucionales con fechas abreviadas y fichas oficiales |
+| [Teatro del Lago](https://teatrodellago.cl/agenda-eventos/) | Música, danza, exposiciones y formación en Frutillar, Los Lagos | API pública The Events Calendar paginada |
+| [Teatro Municipal de Chillán](https://teatrochillan.cl/cartelera/) | Teatro, conciertos, danza, cine y humor en Ñuble | Sección de próximos eventos; fecha con año y hora en la ficha |
+| [Teatro Regional Cervantes](https://www.teatroregionalcervantes.cl/cartelera/) | Cine, música, danza y artes escénicas en Valdivia, Los Ríos | Tarjetas HTML con fecha completa, categorías y enlaces individuales |
+| [Corporación Cultural de Puerto Montt](https://culturapuertomontt.cl/cartelera/) | Programación de los espacios de la corporación en Puerto Montt, Los Lagos | Cartelera móvil de los próximos 30 días; descripción, imagen y organizador explícito desde la ficha |
+| [Teatro Oriente](https://teatrooriente.cl/cartelera-eventos/) | Cine, teatro, conciertos, humor y temporadas líricas en Providencia | Cartelera HTML y fechas ISO del JSON-LD público; no consulta la API protegida |
 
 ## Criterios de tratamiento
 
@@ -52,7 +57,29 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
 - La configuración ejecutable de cada fuente reside en `sources/`; `_template.json` es solo una
   plantilla y no se ejecuta.
 
-La configuración vigente contiene **21 fuentes permanentes y 1 fuente estacional de septiembre**. Todas están habilitadas; la fuente de FondasChile se ejecuta únicamente durante septiembre. Una configuración sin eventos vigentes no aparece en el conteo visible de la aplicación.
+La configuración vigente contiene **26 fuentes permanentes y 1 fuente estacional de septiembre** (27 configuraciones). Todas están habilitadas; la fuente de FondasChile se ejecuta únicamente durante septiembre. Una configuración sin eventos vigentes no aparece en el conteo visible de la aplicación.
+
+## Comprobación de las cinco incorporaciones del 27-10-2026
+
+Se ejecutó una extracción local de solo lectura, con el cliente HTTP del proyecto, TLS verificado,
+pausa de un segundo por solicitud y sin NVIDIA ni conexión a Supabase. Las cinco fuentes
+completaron la prueba: Teatro del Lago (7 fichas vigentes), Chillán (5), Cervantes (18), Puerto
+Montt (4) y Oriente (9): 43 fichas antes de deduplicar contra el catálogo existente. Estos conteos
+son una observación de la prueba, no una cantidad esperada permanente ni garantía de disponibilidad
+desde GitHub Actions. Se comprobó saneamiento y normalización de fechas, ubicación, categorías y URL.
+
+La cartelera de Puerto Montt tiene una ventana de 30 días definida por el sitio; no se afirma
+haber extraído todo su archivo ni toda su programación futura. Allí el año se interpreta dentro
+de esa ventana y el organizador solo se asigna si la ficha lo declara. En Chillán se toma el año
+explícito del detalle (incluidos eventos de 2027). Oriente excluye cancelaciones y avisos
+permanentes que no representan funciones. Las fichas cuyo detalle falle temporalmente dejan la
+fuente como parcial, para no autorizar eliminaciones por una extracción incompleta.
+
+La accesibilidad pública y la ausencia de un bloqueo aplicable en `robots.txt` no equivalen a
+una autorización contractual. Se conserva la atribución y debe atenderse cualquier solicitud
+de exclusión de la fuente u organizador. El inventario Excel conserva su auditoría anterior;
+esta ampliación se documenta aquí y en los JSON ejecutables, sin asignarle un puntaje técnico
+histórico que no haya sido recalculado.
 
 ## Fuente retirada
 

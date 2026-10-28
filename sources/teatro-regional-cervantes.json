@@ -1,0 +1,31 @@
+{
+  "name": "Teatro Regional Cervantes",
+  "url": "https://www.teatroregionalcervantes.cl/cartelera/",
+  "connector": "html_cards",
+  "region": "Región de Los Ríos",
+  "commune": "Valdivia",
+  "city": "Valdivia",
+  "organizer": "Asociación Patrimonial Cultural de la Región de Los Ríos",
+  "venue": "Teatro Regional Cervantes",
+  "address": "Chacabuco 210, Valdivia",
+  "default_categories": ["Cultura"],
+  "card_selector": ".e-loop-item.type-calendario",
+  "selectors": {
+    "title": "h2 a",
+    "start_date": ".elementor-widget-icon-list .elementor-icon-list-item:first-child .elementor-icon-list-text",
+    "start_time": {"selector": ".elementor-widget-icon-list .elementor-icon-list-item:last-child .elementor-icon-list-text", "format": "time"},
+    "category": ".elementor-post-info__terms-list-item",
+    "image_url": {"selector": "img", "attribute": "src"},
+    "source_url": {"selector": "h2 a", "attribute": "href"}
+  },
+  "next_page_selector": "a.next.page-numbers",
+  "require_start_date": true,
+  "max_results": 0,
+  "max_pages": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_verified_at": "2026-10-27",
+  "integration_note": "Cartelera institucional con día, mes, año y hora visibles. Se omiten las fechas vencidas y se conserva la URL individual de cada función."
+}

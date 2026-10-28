@@ -1,0 +1,36 @@
+{
+  "name": "Teatro Municipal de Chillán",
+  "url": "https://teatrochillan.cl/cartelera/",
+  "connector": "html_cards",
+  "region": "Región de Ñuble",
+  "commune": "Chillán",
+  "city": "Chillán",
+  "organizer": "Corporación Cultural Municipal de Chillán",
+  "venue": "Teatro Municipal de Chillán",
+  "address": "18 de Septiembre 590, Chillán",
+  "default_categories": ["Cultura"],
+  "card_selector": ".events-group-proximos article.event-card",
+  "selectors": {
+    "title": ".event-title",
+    "category": ".event-category-badge",
+    "price": ".event-price",
+    "audience": ".event-meta-item:last-child span",
+    "image_url": {"selector": "img", "attribute": "src"},
+    "source_url": {"selector": "a.event-link", "attribute": "href"}
+  },
+  "detail_selectors": {
+    "start_date": ".info-content:has(.info-label:-soup-contains('FECHA')) .info-value",
+    "start_time": {"selector": ".info-content:has(.info-label:-soup-contains('HORA')) .info-value", "format": "time"},
+    "description": ".evento-ficha-accordions .entry-content",
+    "audience": ".info-content:has(.info-label:-soup-contains('PÚBLICO')) .info-value"
+  },
+  "detail_required_fields": ["start_date"],
+  "require_start_date": true,
+  "max_results": 0,
+  "use_nvidia": false,
+  "official": true,
+  "enabled": true,
+  "integration_status": "active",
+  "integration_verified_at": "2026-10-27",
+  "integration_note": "Lee exclusivamente la sección de próximos eventos. Consulta la fecha con año y hora en cada ficha; no usa la fecha de publicación de WordPress ni infiere el año de los afiches."
+}

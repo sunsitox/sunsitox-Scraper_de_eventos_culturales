@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup, Tag
+import requests
+from bs4 import BeautifulSoup
 
 from ..config import SourceConfig
 from ..models import Event
@@ -15,6 +15,7 @@ from ..text import (
     chile_now,
     clean,
     clean_list,
+    event_timestamp,
     is_upcoming,
     normal_date,
     now_iso,
@@ -22,6 +23,7 @@ from ..text import (
 )
 from .base import Connector
 from .registry import register_connector
+from .html_support import detail_values, same_site_url, selector_value
 
 
 ABBREVIATED_SPANISH_MONTHS = {
@@ -38,22 +40,6 @@ ABBREVIATED_SPANISH_MONTHS = {
     "nov": "noviembre",
     "dic": "diciembre",
 }
-
-
-def selector_value(card: Tag, rule: str | dict[str, Any] | None) -> str:
-    if not rule:
-        return ""
-    if isinstance(rule, str):
-        selector, attribute = rule, "text"
-    else:
-        selector = clean(rule.get("selector"))
-        attribute = clean(rule.get("attribute")) or "text"
-    node = card.select_one(selector) if selector else None
-    if not node:
-        return ""
-    if attribute == "text":
-        return clean(node.get_text(" "))
-    return clean(node.get(attribute, ""))
 
 
 def card_categories(source: SourceConfig, card_text: str, explicit: object) -> list[str]:
@@ -189,34 +175,67 @@ def spanish_abbreviated_range(value: str, current=None) -> tuple[str, str]:
 class HtmlCardsConnector(Connector):
     """Convierte tarjetas usando selectores definidos únicamente en el JSON."""
 
-    def collect(self, source: SourceConfig) -> list[Event]:
+    def _cards(self, source):
         configured_headers = source.get("request_headers", {})
         request_headers = (
             {str(key): str(value) for key, value in configured_headers.items()}
             if isinstance(configured_headers, dict)
             else None
         )
-        html = self.http.get_html(
-            source.url,
-            verify=bool(source.get("verify_ssl", True)),
-            request_headers=request_headers,
-        )
-        if not html:
-            return []
-        soup = BeautifulSoup(html, "html.parser")
         card_selector = clean(source.get("card_selector"))
         selectors = source.get("selectors", {})
         if not card_selector or not isinstance(selectors, dict) or not selectors.get("title"):
             raise ValueError(f"{source.name} requiere card_selector y selectors.title")
+        current, visited = source.url, set()
+        max_pages = max(0, int(source.get("max_pages", 0) or 0))
+        while current:
+            if current in visited or (max_pages and len(visited) >= max_pages):
+                self.collection_complete = False
+                logging.warning("%s: paginación incompleta o repetida", source.name)
+                break
+            visited.add(current)
+            try:
+                html = self.http.get_html(current, verify=bool(source.get("verify_ssl", True)), request_headers=request_headers)
+            except requests.RequestException:
+                if len(visited) == 1:
+                    raise
+                self.collection_complete = False
+                logging.warning("%s: no se pudo completar una página de la cartelera", source.name)
+                break
+            soup = BeautifulSoup(html or "", "html.parser")
+            cards = soup.select(card_selector)
+            if not cards and not source.get("allow_empty_listing", False):
+                if len(visited) == 1:
+                    raise ValueError(f"{source.name}: el selector de tarjetas no produjo resultados; revisar estructura")
+                self.collection_complete = False
+                break
+            for card in cards:
+                yield card, current
+            next_selector = source.get("next_page_selector")
+            next_link = soup.select_one(next_selector) if next_selector else None
+            current = same_site_url(current, next_link["href"]) if next_link and next_link.get("href") else ""
+
+    def collect(self, source: SourceConfig) -> list[Event]:
+        self.collection_complete = True
         limit = int(source.get("max_results", 0) or 0)
+        selectors = source.get("selectors", {})
         results: list[Event] = []
-        cards = soup.select(card_selector)
-        if not cards and not source.get("allow_empty_listing", False):
-            raise ValueError(
-                f"{source.name}: el selector de tarjetas no produjo resultados; revisar estructura"
-            )
-        for card in cards:
+        seen = set()
+        for card, page_url in self._cards(source):
+            card_text = clean(card.get_text(" "))
+            if source.get("exclude_card_pattern") and re.search(source["exclude_card_pattern"], card_text, re.I):
+                continue
             values = {field: selector_value(card, rule) for field, rule in selectors.items()}
+            source_url = urljoin(page_url, values.get("source_url", "")) or page_url
+            if source.get("detail_selectors") or source.get("detail_jsonld_fields"):
+                try:
+                    values.update(detail_values(self.http, source, source_url))
+                except (requests.RequestException, ValueError) as exc:
+                    status = exc.response.status_code if isinstance(exc, requests.RequestException) and exc.response is not None else 0
+                    if status not in {404, 410}:
+                        self.collection_complete = False
+                    logging.warning("%s: ficha omitida %s: %s", source.name, source_url, exc)
+                    continue
             title_remove_pattern = clean(source.get("title_remove_pattern"))
             if title_remove_pattern and values.get("title"):
                 try:
@@ -242,12 +261,11 @@ class HtmlCardsConnector(Connector):
                     parts = date_range.split(separator, maxsplit=1)
                     start_date = parts[0]
                     end_date = parts[1] if len(parts) > 1 else ""
+            date_for_end = end_date or start_date
             if values.get("start_time"):
                 start_date = f"{start_date} {values['start_time']}"
             if values.get("end_time"):
-                end_date = f"{end_date or start_date} {values['end_time']}"
-            source_url = urljoin(source.url, values.get("source_url", "")) or source.url
-            card_text = clean(card.get_text(" "))
+                end_date = f"{date_for_end} {values['end_time']}"
             free = bool(re.search(r"gratis|gratuit|entrada liberada", card_text, re.I))
             event = Event(
                 title=values.get("title", ""),
@@ -276,15 +294,17 @@ class HtmlCardsConnector(Connector):
                 price="Gratis" if free else values.get("price", ""),
                 source_name=source.name,
                 source_url=source_url,
-                official_url=source_url if source.official else "",
+                official_url=values.get("official_url") or (source_url if source.official else ""),
                 extracted_at=now_iso(),
                 extraction_method="html-cards-css",
             )
-            has_required_date = not source.get("require_start_date", False) or bool(
-                event.start_date
-            )
-            if event.title and has_required_date and is_upcoming(event):
+            has_required_date = not source.get("require_start_date", False) or bool(event_timestamp(event.start_date))
+            if not has_required_date or not event.title:
+                self.collection_complete = False
+            identity = (source_url, event.title, event.start_date)
+            if event.title and has_required_date and is_upcoming(event) and identity not in seen:
                 results.append(event)
+                seen.add(identity)
             if limit > 0 and len(results) >= limit:
                 break
         logging.info("  %s: %s fichas por tarjetas HTML", source.name, len(results))

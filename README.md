@@ -1,6 +1,6 @@
 # MVP · agregador de eventos culturales de Chile
 
-El recolector tiene **21 fuentes permanentes y una fuente estacional de septiembre** configuradas mediante una arquitectura modular de conectores. Una fuente solo aparece en la aplicación cuando aporta al menos un evento vigente:
+El recolector tiene **26 fuentes permanentes y una fuente estacional de septiembre** (27 configuraciones) mediante una arquitectura modular de conectores. Una fuente solo aparece en la aplicación cuando aporta al menos un evento vigente:
 
 | Fuente | Región principal | Método |
 |---|---|---|
@@ -17,6 +17,11 @@ El recolector tiene **21 fuentes permanentes y una fuente estacional de septiemb
 | Agenda Universidad de Talca | Maule | Tarjetas HTML declarativas |
 | Corporación Cultural de Iquique | Tarapacá | Tarjetas institucionales declarativas |
 | Centro de Arte Molino Machmar | Los Lagos | Tarjetas institucionales declarativas |
+| Teatro del Lago | Los Lagos, Frutillar | The Events Calendar API |
+| Teatro Municipal de Chillán | Ñuble | Cartelera y fichas con año explícito |
+| Teatro Regional Cervantes | Los Ríos | Tarjetas HTML con fecha completa |
+| Corporación Cultural de Puerto Montt | Los Lagos | Cartelera oficial móvil de 30 días y fichas |
+| Teatro Oriente | Metropolitana, Providencia | Cartelera HTML y JSON-LD de las fichas |
 | Enoturismo Chile · Agenda | Cobertura interregional | WordPress + EventON + taxonomías vinícolas |
 | FISA · Ferias y Exposiciones | Varias regiones | Portafolio oficial FISA |
 | Espacio Riesco · Calendario | Metropolitana | Tarjetas HTML declarativas |
@@ -152,9 +157,15 @@ Se aplican Strategy para los conectores, Registry/Factory para seleccionarlos de
 
 ## NVIDIA NIM
 
-La IA no se usa cuando la fuente ofrece API, microdatos, tarjetas configuradas o JSON-LD. Por eso GAM, Teatro Biobío y Teatro Municipal de Viña se procesan sin consumir NVIDIA. NIM queda como respaldo de las fuentes genéricas que no publican una estructura estándar. Para utilizarlo, copia `.env.example` como `.env` e incorpora tu clave.
+La extracción estructurada no usa IA cuando la fuente ofrece API, microdatos, tarjetas configuradas o JSON-LD. Por ejemplo, las fichas de GAM, Teatro Biobío y Teatro Municipal de Viña se leen sin NVIDIA. Esto no desactiva el enriquecimiento posterior: un evento nuevo o modificado aún puede pasar por OCR, redacción o ubicación. NIM queda como respaldo de extracción para fuentes genéricas que no publican una estructura estándar. Para utilizarlo, copia `.env.example` como `.env` e incorpora tu clave.
 
-El modelo predeterminado es `meta/llama-3.2-11b-vision-instruct`, verificado con la cuenta tanto para texto como para afiches. La solicitud exige un objeto JSON, desactiva el razonamiento interno para que no consuma el límite antes de entregar los eventos y valida la respuesta antes de importarla. `NVIDIA_MAX_TOKENS` y `NVIDIA_INPUT_CHARS` permiten ajustar los límites. Si NVIDIA responde `401`, `403`, `404` o `410`, revisa que el modelo continúe habilitado para la cuenta. El programa desactiva el respaldo IA después de un error permanente para no repetir llamadas fallidas; las fuentes deterministas continúan normalmente.
+El modelo predeterminado configurado es `meta/llama-3.2-11b-vision-instruct`; su acceso depende de la cuenta y del servicio. Las solicitudes exigen JSON y validan la respuesta antes de importarla; el respaldo textual también solicita desactivar el razonamiento interno. `NVIDIA_MAX_TOKENS` y `NVIDIA_INPUT_CHARS` permiten ajustar los límites. Las respuestas `401`, `403` y `410` desactivan el respaldo IA durante esa ejecución; un `404` también requiere revisar endpoint/modelo, pero no pertenece a esa lista de desactivación automática. Las fuentes deterministas continúan normalmente.
+
+El OCR procesa afiches con `image_url` cuyo resultado está ausente, pendiente o vencido en la
+caché, dentro del subconjunto enviado a enriquecimiento. No exige que la descripción HTML esté
+vacía. Por defecto admite hasta 100 imágenes, con 45 segundos de timeout de red, un reintento
+y 100 segundos de presupuesto por operación. Estos 100 segundos no son el presupuesto de toda
+la etapa. No se completan fechas o direcciones mediante suposiciones para compensar un fallo OCR.
 
 Todas las llamadas comparten un limitador global configurado en `NVIDIA_RPM_LIMIT=40`. El intervalo
 mínimo efectivo es de 1,55 segundos, por lo que extracción y normalización no pueden superar en
@@ -209,7 +220,22 @@ Modified`.
 El límite se coordina dentro de una ejecución. GitHub Actions ya impide dos workflows simultáneos,
 pero una ejecución local y otra en GitHub no comparten memoria; si ambas usan la misma clave al
 mismo tiempo, el límite de la cuenta podría alcanzarse y NVIDIA respondería `429`. El cliente
-respeta `Retry-After` y realiza un único reintento predeterminado.
+respeta `Retry-After`. El OCR usa un reintento predeterminado; redacción y ubicación usan tres,
+y el respaldo genérico usa `NVIDIA_MAX_RETRIES` (ocho por defecto), sujetos a sus presupuestos.
+
+### Interpretar los resultados de IA
+
+- `Read timed out` indica falta de respuesta dentro del timeout. No demuestra agotamiento de
+  cuota; una limitación RPM se identifica por HTTP `429`. La URL del evento identifica el registro;
+  el host del error indica dónde falló la comunicación.
+- `Envoltura HTTP NVIDIA no es JSON válido` y los errores de contenido del modelo se diagnostican
+  por separado. El cuerpo y las credenciales no se escriben en el log.
+- `OCR NVIDIA se suspende...` es una degradación controlada: conserva los pendientes y permite
+  llegar a la sincronización. El número informado corresponde al lote restante, no a toda la cola.
+- `publicación atómica completada` y `eventos sincronizados` confirman publicación remota. El
+  éxito puede coexistir con OCR pendiente; no significa que todo el enriquecimiento esté terminado.
+- El tiempo del resumen corresponde al comando ejecutado. En Actions hay comandos separados
+  para extracción y procesamiento; no debe confundirse un resumen de fase con la duración del workflow.
 
 ## Normalización de ubicaciones
 

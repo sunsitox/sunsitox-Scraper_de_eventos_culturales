@@ -56,8 +56,8 @@ class DatabaseDocumentationTests(unittest.TestCase):
         )
         rendered = generator.render_mermaid(tables)
 
-        self.assertEqual(len(tables), 14)
-        self.assertEqual(sum(len(table.columns) for table in tables), 108)
+        self.assertEqual(len(tables), 15)
+        self.assertEqual(sum(len(table.columns) for table in tables), 115)
         self.assertEqual(
             generator.DEFAULT_OUTPUT.read_text(encoding="utf-8"),
             rendered,

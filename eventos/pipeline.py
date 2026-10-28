@@ -17,6 +17,8 @@ from .availability import EventAvailabilityValidator
 from .analytics import SourceSummary, write_source_summaries
 from .config import Settings, SourceConfig, SourceRepository
 from .cultural_filter import filter_cultural_events, write_cultural_audit
+from .classification import classify_events
+from .services.category_classifier import NvidiaCategoryClassifier
 from .connectors import ConnectorFactory
 from .consolidation import deduplicate, deduplicate_resolved, filter_regions
 from .exporters import DatasetExporter
@@ -234,6 +236,8 @@ class EventPipeline:
             if should_push
             else None
         )
+        if remote is not None:
+            remote.require_classification_schema()
         config_signature = digest([chile_now().month, [dict(source) for source in sources]])
         if phase == "process":
             snapshot = self.state.get("pipeline", "extracted", {})
@@ -251,10 +255,18 @@ class EventPipeline:
             return all_events
         self.sanitizer.apply(all_events)
         events = deduplicate(all_events)
+        # Se reaplica incluso a checkpoints y eventos ya publicados: no depende
+        # de que Supabase los considere nuevos para OCR/redacción.
+        classify_events(events)
+        early_decisions = []
+        if settings.cultural_filter_enabled:
+            events, preliminary = filter_cultural_events(events, review_action="keep")
+            early_decisions = [item for item in preliminary if item.decision == "excluded"]
         # El ID se calcula antes de enriquecer ubicación para mantenerlo estable entre versiones.
         self.location_normalizer.apply_source_defaults(events, sources)
         raw_inputs = {id(event): replace(event) for event in events}
         new_events = events
+        classification_requests_allowed = True
         if remote is not None:
             try:
                 events, new_events = remote.prepare_for_enrichment(events)
@@ -268,6 +280,7 @@ class EventPipeline:
                     exc,
                 )
                 new_events = []
+                classification_requests_allowed = False
         # Todo evento permitido consulta su versión local; una cola pendiente puede existir
         # aunque Supabase ya tenga la fila. Nunca reincorporamos eventos suprimidos/removidos.
         for event in events:
@@ -287,9 +300,17 @@ class EventPipeline:
         self.sanitizer.apply(events)
         events = filter_regions(events, settings)
         if settings.cultural_filter_enabled:
+            if remote is not None:
+                try:
+                    remote.restore_classification_evidence(events)
+                except (requests.RequestException, SupabaseError) as exc:
+                    logging.warning("No se pudo restaurar la clasificación remota; se conserva la caché local: %s", exc)
+                    classification_requests_allowed = False
+            NvidiaCategoryClassifier(queue).enrich(events, allow_requests=classification_requests_allowed)
             events, cultural_decisions = filter_cultural_events(
                 events, review_action=settings.cultural_review_action
             )
+            cultural_decisions = early_decisions + cultural_decisions
             write_cultural_audit(cultural_decisions)
             decision_counts: dict[str, int] = {}
             for item in cultural_decisions:
@@ -313,7 +334,8 @@ class EventPipeline:
             # tenga JSON activo: sus registros no deben sobrevivir al cambio
             # de proveedor por simple ausencia en la corrida actual.
             reconcile_sources.update(settings.retired_source_names)
-            remote.export(events, reconcile_sources=reconcile_sources)
+            rejected = [item.event for item in cultural_decisions if item.decision == "excluded"] if settings.cultural_filter_enabled else []
+            remote.export(events, reconcile_sources=reconcile_sources, classification_rejections=rejected)
         self.state.put("pipeline", "published", {"cycle": self.cycle, "events": event_rows(events)})
         if all(
             summary.status in {"succeeded", "complete_empty"}

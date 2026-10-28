@@ -396,7 +396,7 @@ class SupabaseRestClient:
             "communes": bundle.communes,
             "categories": bundle.categories,
             "events": bundle.events,
-            "event_provenance": bundle.event_provenance,
+            "event_provenance": bundle.event_provenance + bundle.classification_updates,
             "event_categories": bundle.event_categories,
             "media_assets": bundle.media_assets,
         }
@@ -462,6 +462,7 @@ class SupabaseBundle:
     event_categories: list[dict[str, Any]] = field(default_factory=list)
     media_assets: list[dict[str, Any]] = field(default_factory=list)
     event_provenance: list[dict[str, Any]] = field(default_factory=list)
+    classification_updates: list[dict[str, Any]] = field(default_factory=list)
     event_ids: list[str] = field(default_factory=list)
 
 
@@ -558,7 +559,9 @@ def build_supabase_bundle(events: list[Event], seen_at: str | None = None) -> Su
                 if any(clean(value) for value in (event.venue, event.address, event.commune, event.city))
                 else "geographic-fallback"
             ),
-            "status": "published",
+            "status": (event.classification.get("publication_status")
+                       if event.classification.get("publication_status") in {"draft", "archived"}
+                       else "published"),
             "audience": clean(event.audience) or None,
             "is_free": optional_bool(event.is_free),
             "description": clean(event.description) or None,
@@ -577,6 +580,7 @@ def build_supabase_bundle(events: list[Event], seen_at: str | None = None) -> Su
             "source_description": clean(event.source_description) or None,
             "ocr_text": clean(event.ocr_text) or None,
             "is_rewritten": bool(event.is_rewritten),
+            "classification": event.classification,
         }
 
         for category_name in event.categories:
@@ -699,6 +703,41 @@ class SupabaseExporter:
         )
         return publishable, new_events
 
+    def require_classification_schema(self) -> None:
+        """Falla antes de consumir IA si falta la migración de clasificación."""
+        try:
+            self.client.select("event_provenance", {"select": "classification", "limit": "0"})
+        except SupabaseError as exc:
+            raise SupabaseError(
+                "No se pudo verificar la clasificación en Supabase. Aplica primero "
+                "20261027000100_cultural_classification.sql y vuelve a ejecutar. " + str(exc)
+            ) from exc
+
+    def restore_classification_evidence(self, events: list[Event]) -> None:
+        """Reutiliza IA remota compatible aunque se haya perdido la caché local."""
+        from ..classification import CLASSIFICATION_VERSION, classify_event, input_signature
+        candidates = {}
+        for event in events:
+            classify_event(event)
+            if not event.categories:
+                identity = stable_uuid("event", clean(event.event_id) or fingerprint(event))
+                candidates[identity] = event
+        ids = list(candidates)
+        for start in range(0, len(ids), 200):
+            rows = self.client.select("event_provenance", {
+                "select": "event_id,classification",
+                "event_id": "in.(" + ",".join(ids[start:start+200]) + ")",
+            })
+            for row in rows:
+                event = candidates.get(row.get("event_id"))
+                metadata = row.get("classification")
+                if (event is not None and isinstance(metadata, dict)
+                        and metadata.get("version") == CLASSIFICATION_VERSION
+                        and metadata.get("input_signature") == input_signature(event)):
+                    event.classification["ai_evidence"] = metadata.get("ai_evidence", [])
+                    event.classification["ai_checked"] = bool(metadata.get("ai_checked"))
+                    classify_event(event)
+
     def _without_blocked_organizers(self, events: list[Event]) -> list[Event]:
         method = getattr(self.client, "blocked_organizer_names", None)
         if not callable(method):
@@ -744,11 +783,27 @@ class SupabaseExporter:
         events: list[Event],
         *,
         reconcile_sources: set[str] | None = None,
+        classification_rejections: list[Event] | None = None,
     ) -> None:
         started_at = datetime.now(timezone.utc).isoformat()
         run_id = str(uuid.uuid4())
         events = self._without_blocked_organizers(events)
         bundle = build_supabase_bundle(events, started_at)
+        if classification_rejections:
+            rejected = self._without_blocked_organizers(classification_rejections)
+            matches = self.client.match_existing_events(rejected)
+            for event in rejected:
+                match = matches.get(clean(event.event_id) or fingerprint(event))
+                if not match or match.get("stored_is_suppressed") or not match.get("stored_has_provenance"):
+                    continue
+                external_key = clean(match.get("stored_external_key"))
+                if not external_key:
+                    continue
+                bundle.classification_updates.append({
+                    "classification_only": True, "id": stable_uuid("event", external_key),
+                    "classification": event.classification,
+                    "category_ids": {name: stable_uuid("category", name) for name in event.categories},
+                })
         self.client.upsert(
             "scrape_runs",
             [self._run_row(run_id, started_at, "running", len(bundle.events))],

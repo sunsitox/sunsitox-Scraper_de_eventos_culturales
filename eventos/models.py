@@ -22,6 +22,8 @@ class Event:
     longitude: str = ""
     organizer: str = ""
     categories: list[str] = field(default_factory=list)
+    # Taxonomía versionada y etiquetas originales; no mezcla públicos/programas con disciplinas.
+    classification: dict = field(default_factory=dict)
     audience: str = ""
     is_free: str = ""
     description: str = ""

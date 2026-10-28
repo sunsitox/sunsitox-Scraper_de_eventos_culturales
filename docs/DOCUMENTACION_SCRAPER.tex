@@ -243,7 +243,9 @@ La separaci\'{o}n de fases permite conservar el trabajo de extracci\'{o}n si se 
 
 Todo conector entrega el mismo modelo l\'{o}gico. Los campos fundamentales son \texttt{title}, \texttt{start\_date}, \texttt{end\_date}, \texttt{venue}, \texttt{location}, \texttt{commune}, \texttt{region}, \texttt{organizer}, \texttt{categories}, \texttt{source\_url} y \texttt{official\_url}.
 
-Las categor\'{i}as son siempre una lista, no una cadena. Un mismo evento puede pertenecer simult\'{a}neamente a m\'{u}sica, familiar y gratuito. En el JSON se guarda como arreglo; en CSV se serializa como JSON dentro de una celda; en Supabase se normaliza mediante \texttt{categories} y \texttt{event\_categories}.
+Las categor\'{i}as son siempre una lista de disciplinas culturales, no una cadena. Un evento puede pertenecer simult\'{a}neamente a m\'{u}sica y danza. Familiar es un p\'{u}blico; gratuito es una condici\'{o}n de acceso, no una disciplina. En JSON se guarda como arreglo; en CSV se serializa como JSON dentro de una celda; en Supabase se normaliza mediante \texttt{categories} y \texttt{event\_categories}.
+
+La revisi\'{o}n del 27 de octubre incorpora 18 disciplinas can\'{o}nicas y el objeto \texttt{classification}: versi\'{o}n, etiquetas originales, formatos, p\'{u}blicos, programas, evidencia y decisi\'{o}n. Se recalcula incluso para eventos conocidos y checkpoints; cambiar la taxonom\'{i}a no obliga a repetir OCR ni redacci\'{o}n. Gu\'{i}as de librer\'{i}as y fichas de espacios no se convierten en eventos por declarar una vigencia de varios a\~{n}os. Una duraci\'{o}n larga, por s\'{i} sola, no descarta una programaci\'{o}n real.
 
 La ubicaci\'{o}n se resuelve de forma transparente y cada evento incluye:
 \begin{itemize}
@@ -260,7 +262,11 @@ El saneador com\'{u}n elimina HTML residual, reglas CSS, scripts, shortcodes de 
 
 Un evento se conserva solo si tiene fecha de inicio v\'{a}lida y todav\'{i}a est\'{a} vigente. La validaci\'{o}n de URL retira fichas confirmadas con HTTP 404/410 o p\'{a}ginas de error inequ\'{i}vocas; ante timeout, bloqueo temporal o error 5xx el registro se conserva para no borrar informaci\'{o}n por una falla pasajera.
 
-El filtro cultural funciona despu\'{e}s de sanear y consolidar, antes de exportar. Tiene tres resultados: \textit{aceptado}, \textit{revisi\'{o}n} y \textit{excluido}. Se incluye una actividad cuando su finalidad principal o una dimensi\'{o}n sustantiva permite crear, expresar, conservar, interpretar o compartir cultura. El formato por s\'{i} solo ---por ejemplo ``feria'' o ``exposici\'{o}n''--- no determina el resultado. La auditor\'{i}a queda en \texttt{data/cultural\_filter\_audit.json}.
+El filtro realiza una comprobaci\'{o}n antes de consumir IA y otra despu\'{e}s del enriquecimiento. Tiene tres resultados: \textit{aceptado}, \textit{revisi\'{o}n} y \textit{excluido}. Se exige contenido cultural verificable; el nombre de la fuente, organizador o recinto no basta. El formato por s\'{i} solo no determina el resultado. Los casos ambiguos se conservan como \texttt{draft}, no publicados. La m\'{u}sica de acompa\~{n}amiento no convierte una clase de fitness en concierto. La auditor\'{i}a queda en \texttt{data/cultural\_filter\_audit.json}.
+
+Ticketplus y las dem\'{a}s fuentes usan primero reglas sobre el contenido. Solo los casos a\'{u}n ambiguos consultan NVIDIA, con categor\'{i}as permitidas y evidencia literal: lotes de 10, hasta 100 candidatos por corrida, cinco minutos adicionales de presupuesto y suspensi\'{o}n tras tres fallos consecutivos. Se mantiene el l\'{i}mite global de 40 RPM y se reutiliza evidencia compatible local o remota. Un fallo no inventa la categor\'{i}a Otros ni impide sincronizar los casos pendientes como borradores.
+
+Esta versi\'{o}n requiere la migraci\'{o}n \path|20261027000100_cultural_classification.sql|. Instalarla no altera filas del cat\'{a}logo. La publicaci\'{o}n at\'{o}mica conserva los metadatos y archiva exclusiones ya existentes sin borrar interacciones. El comando \texttt{python -m tools.reclassify\_catalog} simula el mantenimiento sin NVIDIA; solo \texttt{--apply} habilita escritura despu\'{e}s de revisar la propuesta. Se protegen eventos manuales, supresiones, fuentes inactivas y organizadores bloqueados. El diccionario de base de datos documenta el campo privado \path|event_provenance.classification| y la RPC de mantenimiento.
 
 \section{IA, OCR y control de cuota}
 
@@ -269,7 +275,8 @@ NVIDIA NIM se usa como respaldo, no como requisito de extracci\'{o}n. Las fichas
   \item respaldo de extracci\'{o}n sem\'{a}ntica cuando un conector gen\'{e}rico no encuentra datos estructurados y tiene habilitado ese respaldo;
   \item OCR de afiches con imagen cuyo resultado est\'{a} ausente, pendiente o vencido en cach\'{e}; no depende de que la descripci\'{o}n HTML est\'{e} vac\'{i}a;
   \item redacci\'{o}n editorial de texto p\'{u}blico, preservando el texto de origen para trazabilidad;
-  \item resoluci\'{o}n por lotes de ubicaciones incompletas.
+  \item resoluci\'{o}n por lotes de ubicaciones incompletas;
+  \item clasificaci\'{o}n con evidencia de disciplinas a\'{u}n ambiguas, sin repetir operaciones ya resueltas.
 \end{itemize}
 
 El l\'{i}mite global se configura en 40 solicitudes por minuto. Todas las llamadas, incluso las iniciadas por fuentes concurrentes, pasan por el mismo regulador. Las respuestas 429, \texttt{Retry-After} y secuencias de timeouts activan pausas controladas; los pendientes no se pierden, sino que pasan a una cola SQLite para una ejecuci\'{o}n futura.

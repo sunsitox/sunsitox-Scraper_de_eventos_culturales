@@ -39,6 +39,41 @@ seguir siendo larga. Ambas pasan por el filtro cultural común.
 
 ## Pipeline reanudable
 
+### Clasificación cultural y corrección del catálogo
+
+La clasificación común se reaplica a **todos** los eventos, incluidos los recuperados de
+checkpoints y los ya conocidos por Supabase; no obliga a repetir OCR o redacción. Usa 18
+disciplinas canónicas y conserva en `classification` las etiquetas originales, formatos,
+públicos, programas, versión, evidencia y decisión. «CONCIERTO» aporta Música/formato Concierto;
+«Familiar» es un público y «PAOCC» un programa, no disciplinas. No se inventa «Otros».
+
+Las guías/directorios de espacios se excluyen antes de consumir IA. Una duración larga por sí
+sola no excluye una actividad. El nombre de la fuente/organizador no demuestra pertinencia
+cultural. El entrenamiento deportivo con música incidental no se transforma en concierto.
+Los casos ambiguos se conservan en revisión como `draft`, no publicados. El frontend debe leer
+solo `status=published` con las credenciales públicas y RLS, nunca una clave `service_role`.
+
+Ticketplus usa primero título, texto original y OCR disponible. Solo las disciplinas aún
+ambiguas consultan NVIDIA: máximo 100 candidatos por ejecución, lotes de 10, presupuesto de
+5 minutos, máximo 3 fallos consecutivos y el mismo límite global de 40 RPM. Las asignaciones
+deben pertenecer a la lista permitida y citar evidencia literal; un fallo conserva la cola.
+
+**Antes de sincronizar con esta versión**, aplica `20261027000100_cultural_classification.sql`.
+La comprobación de esquema falla antes de consumir IA si falta esa migración. La migración
+no reclasifica ni elimina datos al instalarse. Para revisar los eventos existentes:
+
+```powershell
+python -m tools.reclassify_catalog
+# Solo después de revisar data/reclassification_preview.json y aplicar la migración:
+python -m tools.reclassify_catalog --apply
+```
+
+La simulación consulta el catálogo sin escribir en Supabase ni llamar a NVIDIA. El mantenimiento
+actualiza categorías/procedencia y archiva rechazados o deja casos grises como borrador, sin
+borrar eventos ni historial. Protege manuales, supresiones, organizadores bloqueados y fuentes
+inactivas; no elimina categorías antiguas que puedan tener referencias externas. Las reglas
+y los candidatos pendientes requieren revisión: no se promete una clasificación perfecta.
+
 Cada fuente y resultado de IA se guarda en `state/pipeline.sqlite3`. Las tareas OCR pendientes
 se recuperan en futuras ejecuciones; los resultados terminados se reutilizan por versión de entrada.
 El comando habitual sigue funcionando y permite además separar fases:
@@ -130,16 +165,17 @@ no encuentra una instalación global.
 El campo `categories` siempre es una lista y admite múltiples valores por evento. En JSON se guarda como un arreglo real:
 
 ```json
-"categories": ["Música", "Teatro", "Familiar"]
+"categories": ["Música", "Teatro"]
 ```
 
-En CSV se conserva como un arreglo JSON dentro de la celda: `["Música", "Teatro", "Familiar"]`.
+En CSV se conserva como un arreglo JSON dentro de la celda: `["Música", "Teatro"]`.
 En Supabase se normaliza mediante `categories` y `event_categories`, conservando la relación
 muchos-a-muchos sin perder ninguna categoría.
 
-Enoturismo Chile agrega automáticamente la taxonomía publicada por la fuente, por ejemplo
-`["Vino", "Enoturismo", "Fiestas de la Vendimia"]`. FISA y Espacio Riesco añaden categorías
-temáticas como salud, minería, construcción, gastronomía, tecnología o industria naval.
+Enoturismo Chile conserva su taxonomía original en `classification.raw_categories` y la convierte
+a disciplinas canónicas como `Cultura del vino` y `Gastronomía` según evidencia. FISA y Espacio Riesco añaden etiquetas
+temáticas originales; la clasificación común solo publica disciplinas culturales verificadas
+y el filtro excluye encuentros sectoriales sin una dimensión cultural sustantiva.
 
 El alcance predeterminado incluye las 16 regiones de Chile. Chile Cultura entrega la cobertura
 nacional y las demás fuentes activas agregan profundidad local o temática. Ticketplus se mantiene
@@ -279,7 +315,7 @@ El asistente pregunta nombre, URL, región, comuna, organizador y, opcionalmente
 dirección asumidos para toda la fuente. Después crea automáticamente un archivo dentro de
 `sources/`. No hace falta modificar `scrape_events.py`.
 
-También permite indicar una o más categorías predeterminadas separadas por punto y coma, por ejemplo `Cultura;Familiar;Gratuito`.
+También permite indicar etiquetas predeterminadas separadas por punto y coma, por ejemplo `Música;Danza` cuando la fuente realmente se limita a esas disciplinas. Las etiquetas genéricas no acreditan pertinencia cultural y públicos/precios no se publican como disciplinas.
 
 También puedes copiar `sources/_template.json`, cambiarle el nombre y editar sus valores. Los archivos cuyo nombre comienza con `_` se consideran plantillas y no se ejecutan.
 
@@ -298,7 +334,7 @@ Cada fuente se controla desde su propio archivo en `sources/`:
 - `max_results`: `0` significa sin límite para Chile Cultura y Santiago Cultura.
 - `max_pages`: limita cuántas fichas descubre una fuente genérica; el valor predeterminado del asistente es `30`.
 - `max_pages`: `0` hace que Maipú detecte y recorra automáticamente todas sus páginas.
-- `category_filter`: está vacío para incluir todas las actividades municipales de Maipú. Puedes escribir `Cultura` si después quieres restringirlas.
+- `category_filter`: vacío permite leer todas las actividades de Maipú; después se aplica la clasificación común y el filtro cultural. Puedes escribir `Cultura` para restringir además la lectura en origen.
 - `headless`: Maipú usa `false`, por lo que abre temporalmente una ventana de navegador; su protección bloquea navegadores invisibles.
 - `browser_request_interval`: pausa mínima entre páginas de la API interna de Maipú.
 - `description_max_chars`: límite opcional de descripción para una fuente concreta.

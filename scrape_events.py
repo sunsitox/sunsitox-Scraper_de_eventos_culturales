@@ -18,6 +18,9 @@ from eventos.services import NvidiaContentEnricher, SupabaseExporter
 from eventos.state import StateStore
 from eventos.enrichment_queue import EnrichmentQueue
 from eventos.services.nvidia import configure_nvidia_state
+from eventos.classification import classify_events
+from eventos.cultural_filter import filter_cultural_events, write_cultural_audit
+from eventos.services.category_classifier import NvidiaCategoryClassifier
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,6 +80,12 @@ def main() -> None:
             load_dotenv(ROOT / ".env")
             events = load_json_dataset()
             EventSanitizer().apply(events)
+            classify_events(events)
+            settings = Settings.load()
+            early_decisions = []
+            if settings.cultural_filter_enabled:
+                events, preliminary = filter_cultural_events(events, review_action="keep")
+                early_decisions = [item for item in preliminary if item.decision == "excluded"]
             reconcile_sources = None
             if args.reconcile_existing:
                 sources = SourceRepository().load()
@@ -84,6 +93,7 @@ def main() -> None:
                 reconcile_sources = load_reconcilable_sources()
                 reconcile_sources.update(Settings.load().retired_source_names)
             remote = SupabaseExporter.from_env()
+            remote.require_classification_schema()
             if args.enrich_existing:
                 state = StateStore()
                 configure_nvidia_state(state)
@@ -103,10 +113,18 @@ def main() -> None:
                     content_stats["rewritten"],
                 )
             events = deduplicate_resolved(events)
+            if settings.cultural_filter_enabled:
+                remote.restore_classification_evidence(events)
+                classifier = NvidiaCategoryClassifier(EnrichmentQueue(state)) if args.enrich_existing else None
+                if classifier is not None:
+                    classifier.enrich(events)
+                events, decisions = filter_cultural_events(events, review_action=settings.cultural_review_action)
+                write_cultural_audit(early_decisions + decisions)
             DatasetExporter().export(events)
             remote.export(
                 events,
                 reconcile_sources=reconcile_sources,
+                classification_rejections=[item.event for item in early_decisions + decisions if item.decision == "excluded"] if settings.cultural_filter_enabled else [],
             )
         else:
             events = EventPipeline().run(push_to_supabase=push, phase=args.phase)

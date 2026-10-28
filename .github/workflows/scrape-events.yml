@@ -109,10 +109,15 @@ jobs:
       NVIDIA_OCR_MAX_RETRIES: "1"
       NVIDIA_OCR_RETRY_MAX_WAIT_SECONDS: "15"
       NVIDIA_OCR_RETRY_MAX_ELAPSED_SECONDS: "100"
-      # Presupuestos de IA: 20 min OCR + 20 min redaccion + 5 min ubicacion.
+      # Presupuestos IA: 20 min OCR + 20 min redaccion + 5 min ubicacion + 5 min clasificacion.
       # Se reserva margen del paso de 80 min para exportar y sincronizar.
       NVIDIA_OCR_STAGE_BUDGET_SECONDS: "1200"
       NVIDIA_OCR_FAILURE_THRESHOLD: "3"
+      NVIDIA_CLASSIFICATION_ENABLED: "true"
+      NVIDIA_CLASSIFICATION_BATCH_SIZE: "10"
+      NVIDIA_CLASSIFICATION_MAX_EVENTS: "100"
+      NVIDIA_CLASSIFICATION_STAGE_BUDGET_SECONDS: "300"
+      NVIDIA_CLASSIFICATION_FAILURE_THRESHOLD: "3"
       SOURCE_WORKERS: "4"
       HTTP_CACHE_ENABLED: "true"
       EVENT_DESCRIPTION_MAX_CHARS: "8000"

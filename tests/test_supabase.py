@@ -108,6 +108,23 @@ class FakeSupabaseClient:
 
 
 class SupabaseExporterTests(unittest.TestCase):
+    def test_rejected_existing_event_is_staged_for_archival_not_reinserted(self):
+        from eventos.cultural_filter import filter_cultural_events
+        client = FakeSupabaseClient()
+        event = SupabaseBundleTests().sample_event()
+        event.categories = ['Guía de Librerías']
+        filter_cultural_events([event])
+        client.match_existing_events = lambda rows: {event.event_id: {
+            'stored_external_key':event.event_id, 'stored_has_provenance':True,
+            'stored_is_suppressed':False,
+        }}
+        SupabaseExporter(client).export([],classification_rejections=[event])
+        staged = next(call[3] for call in client.calls if call[0]=='stage')
+        self.assertEqual(staged.events,[])
+        self.assertEqual(len(staged.classification_updates),1)
+        self.assertTrue(staged.classification_updates[0]['classification_only'])
+        self.assertEqual(staged.classification_updates[0]['classification']['decision'],'excluded')
+
     def test_records_run_and_publishes_the_staged_catalog_atomically(self):
         client = FakeSupabaseClient()
         event = SupabaseBundleTests().sample_event()

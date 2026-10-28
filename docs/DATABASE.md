@@ -8,7 +8,7 @@
 | Título de portada | Base de datos de eventos culturales |
 | Proyecto | MVP · Agregador de eventos culturales de Chile |
 | Subtítulo | Diccionario de tablas, columnas, relaciones y categorías |
-| Versión documentada | 20 de octubre de 2026 |
+| Versión documentada | 27 de octubre de 2026 |
 | Esquema | `public` de Supabase/PostgreSQL |
 | Uso | Documento de uso personal |
 | Encabezado | EVENTO CULTURAL · DOCUMENTACIÓN 2026 |
@@ -27,6 +27,8 @@
 - `supabase/migrations/20261020000100_cleanup_expired_events.sql`
 - `supabase/migrations/20261020000200_optimize_event_matching.sql`
 - `supabase/migrations/20261020000300_integrate_expired_cleanup.sql`
+- `supabase/migrations/20261024000100_password_reset_tokens.sql`
+- `supabase/migrations/20261027000100_cultural_classification.sql`
 
 ### Alcance y fuente de verdad
 
@@ -58,6 +60,39 @@ columnas, por lo que el modelo ER conserva sus entidades y relaciones.
 Las nueve migraciones locales y remotas quedaron sincronizadas el 20 de octubre. La aplicación
 de estas migraciones no ejecutó el scraper ni una limpieza sobre el catálogo existente. El nuevo
 comportamiento se utiliza en la siguiente publicación que termine correctamente.
+
+### Recuperación de contraseñas del 24 de octubre de 2026
+
+La migración `20261024000100_password_reset_tokens.sql` añade una tabla privada de seis columnas
+para las Edge Functions de recuperación. Mantiene el contrato del SQL de la aplicación y añade
+una transacción, espera máxima de bloqueos de cinco segundos y permisos explícitos: sin acceso
+para `PUBLIC`, `anon` ni `authenticated`; `service_role` dispone de lectura, inserción,
+actualización y borrado. No modifica eventos, perfiles, contraseñas ni las funciones del scraper.
+
+RLS está activo sin políticas de navegador. El SQL no garantiza por sí solo que un token expire
+o se consuma una única vez: esos controles pertenecen al backend. La revisión de la función
+local de confirmación detectó que marca `used_at` después de actualizar la contraseña y no
+comprueba el error de esa escritura; el consumo atómico y su manejo de fallos requieren una
+corrección independiente. Instalar la tabla no despliega ni valida el envío de correo.
+
+### Clasificación cultural del 27 de octubre de 2026
+
+La migración `20261027000100_cultural_classification.sql` está preparada y probada localmente;
+su presencia en el repositorio no acredita que esté aplicada en Supabase. Añade el objeto JSON
+`event_provenance.classification` y conserva ese objeto durante la publicación atómica. Incluye
+la RPC privada `apply_catalog_classifications(jsonb,text)`, ejecutable solo por `service_role`.
+Instalarla no reclasifica ni borra eventos. No cambia las políticas de usuarios ni de autenticación.
+
+La taxonomía versionada distingue disciplinas, formatos, públicos y programas; conserva las
+etiquetas originales y la evidencia. Los directorios de librerías/museos no se consideran eventos.
+Los casos ambiguos quedan como `draft` y los rechazados se pueden archivar sin borrar filas ni
+interacciones. La RPC de mantenimiento protege publicaciones manuales, supresiones, organizadores
+bloqueados, fuentes inactivas y eventos ya cancelados/archivados. No modifica fechas ni textos.
+
+El comando `python -m tools.reclassify_catalog` produce una simulación local sin NVIDIA. Solo
+`--apply` habilita la escritura después de verificar la migración. Antes de aplicarlo se debe
+revisar la propuesta, ya que puede reducir considerablemente el catálogo visible. Las categorías
+sin asociaciones no se borran automáticamente, para no afectar referencias del backend.
 
 ## 1. Vista general
 
@@ -191,6 +226,7 @@ vigentes entre ejecuciones mediante sus identificadores deterministas.
 | `profiles` | Perfil público mínimo asociado a Supabase Auth. |
 | `user_event_interactions` | Señales de comportamiento para recomendaciones: visualizaciones, interés, descarte, aperturas y compartidos. |
 | `reports` | Avisos de usuarios sobre información incorrecta o problemática. |
+| `password_reset_tokens` | Registro privado de identificadores temporales para recuperación de contraseña mediante Edge Functions; no lo procesa el scraper. |
 
 ### Vistas y funciones operativas
 
@@ -342,6 +378,7 @@ Tabla privada para auditoría y reutilización de resultados. No tiene permisos 
 | `source_description` | `text` | Opcional | Descripción saneada tal como fue obtenida de la fuente. |
 | `ocr_text` | `text` | Opcional | Texto visible transcrito desde el afiche. |
 | `is_rewritten` | `boolean` | Obligatorio | Indica si `events.description` difiere del texto original. |
+| `classification` | `jsonb` | Objeto, predeterminado `{}` | Versión, etiquetas originales, disciplinas canónicas, formatos, públicos, programas, evidencia y decisión. Requiere la migración del 27 de octubre. |
 | `updated_at` | `timestamptz` | Automático | Última actualización de la evidencia. |
 
 ### `event_categories`
@@ -436,6 +473,26 @@ paso del tiempo.
 | `occurred_at` | `timestamptz` | Automático | Momento de la interacción. |
 | `metadata` | `jsonb` | Objeto vacío por defecto | Contexto no sensible opcional, por ejemplo superficie de origen. |
 
+### `password_reset_tokens`
+
+Tabla privada de soporte a las Edge Functions `reset-password-request` y
+`reset-password-confirm`. No almacena contraseñas ni el JWT firmado completo; almacena su
+identificador `jti` y el estado operativo. El correo es un dato personal y no se expone al cliente.
+
+| Columna | Tipo | Requisito | Significado |
+|---|---|---|---|
+| `jti` | `uuid` | PK obligatoria, sin valor por defecto | Identificador aleatorio generado por el backend para asociar el JWT temporal con una única fila. |
+| `user_id` | `uuid` | FK obligatoria → `auth.users.id` | Cuenta destinataria; al eliminarla, sus tokens se eliminan en cascada. |
+| `email` | `text` | Obligatorio | Correo asociado a la solicitud, normalizado por el backend. |
+| `expires_at` | `timestamptz` | Obligatorio | Vencimiento que las Edge Functions deben comprobar; la tabla no ejecuta expiración automática. |
+| `used_at` | `timestamptz` | Opcional | Marca de consumo; `null` indica que no se ha registrado su utilización. |
+| `created_at` | `timestamptz` | Automático, `now()` | Momento de creación; permite contar solicitudes recientes. |
+
+La PK impide identificadores duplicados. Los índices `idx_password_reset_tokens_email` y
+`idx_password_reset_tokens_expira` soportan búsquedas por correo y limpieza por vencimiento.
+El scraper no carga, concilia ni elimina esta tabla. Su ciclo de vida corresponde al backend de
+recuperación, sin ampliar los permisos del frontend.
+
 ### `reports`
 
 Reportes de usuarios sobre un evento, por ejemplo fecha incorrecta, evento cancelado o enlace roto.
@@ -475,8 +532,14 @@ supresión existentes. Es `STABLE`, no modifica datos y mantiene la firma REST a
 
 ## 5. Diccionario de categorías observadas
 
-Las categorías son **dinámicas**: se copian desde las taxonomías de las fuentes y se complementan
-con reglas de los conectores. Por ello, esta sección es una **fotografía histórica** del archivo
+Antes de la revisión del 27 de octubre las categorías eran dinámicas: se copiaban desde las
+fuentes y se complementaban con reglas locales, mezclando disciplinas con otros conceptos.
+Con la nueva clasificación, `categories` contiene únicamente las 18 disciplinas canónicas de
+`eventos/classification.py`; formatos, públicos, programas y etiquetas originales se conservan
+en el objeto privado `classification`. No se asigna «Otros» por falta de evidencia: esos casos
+quedan en revisión como borradores. Las tablas siguientes no son la taxonomía nueva.
+
+Esta sección conserva una **fotografía histórica** del archivo
 local del 1 de septiembre de 2026: **399 eventos y 61 etiquetas**; no representa el catálogo
 vigente y la cantidad puede cambiar en cada corrida.
 
@@ -616,6 +679,8 @@ RLS de las tablas y, por tanto, no expone eventos suprimidos ni organizadores bl
 `cleanup_expired_events()` y `publish_staged_catalog(...)` no se exponen al navegador. Se reservan al proceso de ingesta que
 opera con `service_role`. La función `is_organizer_blocked(uuid)` puede ejecutarse desde las
 políticas públicas, pero solo devuelve un booleano y no revela el motivo ni la fecha del bloqueo.
+`password_reset_tokens` también deniega el acceso de `anon` y `authenticated`; sus permisos
+de lectura y escritura corresponden al backend con `service_role`, no al usuario autenticado.
 
 ## 8. Ciclo de carga
 
@@ -762,6 +827,11 @@ PostgreSQL embebido mediante PGlite, con zonas UTC, Santiago y Tokio. Pasaron ta
 144 pruebas de Python, incluida la comprobación de que este diccionario referencia todas las
 migraciones versionadas. Esto no sustituye la primera ejecución del nuevo trabajo en GitHub
 Actions con PostgreSQL 17; su resultado se consulta en el workflow después del push.
+
+La regresión SQL añadida el 24 de octubre verifica además el esquema de recuperación: RLS,
+ausencia de permisos públicos incluso para `TRUNCATE`, permisos CRUD del backend, valores
+predeterminados, unicidad de `jti`, referencia a usuarios y cascada al eliminar el usuario
+ficticio. Se ejecuta con rollback y no envía correos ni cambia contraseñas reales.
 
 ## 11. Limitaciones conocidas
 

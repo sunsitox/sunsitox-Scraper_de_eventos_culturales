@@ -13,6 +13,9 @@ class EnrichmentQueue:
         self.attempt = uuid.uuid4().hex
 
     def key(self, stage, event):
+        if stage == "classify":
+            from .classification import input_signature
+            return digest(["classify-v1", input_signature(event), os.getenv("NVIDIA_MODEL", "meta/llama-3.2-11b-vision-instruct")])
         if stage == "ocr":
             # Identidad del recurso, no hash de sus bytes: una URL estable requiere revalidación periódica.
             return digest(["ocr-v1", event.image_url, os.getenv("NVIDIA_OCR_MODEL", "meta/llama-3.2-11b-vision-instruct")])
@@ -58,6 +61,9 @@ class EnrichmentQueue:
         identity = event.event_id or digest([raw.source_name, raw.source_url, raw.title, raw.start_date[:10]])
         fields = ("title", "start_date", "end_date", "venue", "address", "commune", "region", "organizer", "categories", "price", "currency", "image_url", "source_description")
         current = {key: getattr(raw, key) for key in fields}
+        # Cambiar la taxonomía no exige repetir OCR ni redacción de los mismos hechos.
+        from .classification import original_categories
+        current["categories"] = original_categories(raw)
         previous = self.store.get("inputs", identity, {})
         old = previous.get("raw")
         invalidated = bool(previous.get("invalidated") or (old and old != current))

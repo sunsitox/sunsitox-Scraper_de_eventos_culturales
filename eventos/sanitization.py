@@ -99,6 +99,8 @@ class EventSanitizer:
         )
         if not event.categories and source is not None:
             event.categories = clean_list(source.get("default_categories", []))
+        if not isinstance(event.classification, dict):
+            event.classification = {}
         return event
 
     def apply(self, events: list[Event], source: SourceConfig | None = None) -> list[Event]:

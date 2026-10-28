@@ -94,6 +94,7 @@ Table event_provenance {
   source_description text
   ocr_text text
   is_rewritten boolean [not null, default: false]
+  classification jsonb [not null, default: `'{}'::jsonb`, note: 'Taxonomia versionada; requiere migracion 20261027000100']
   updated_at timestamptz [not null, default: `now()`]
 }
 
@@ -156,6 +157,21 @@ Table reports {
   updated_at timestamptz [not null, default: `now()`]
 }
 
+// Soporte privado de recuperacion de contrasena (no pertenece al pipeline).
+Table password_reset_tokens {
+  jti uuid [pk]
+  user_id uuid [not null, ref: > auth_users.id]
+  email text [not null]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    email [name: 'idx_password_reset_tokens_email']
+    expires_at [name: 'idx_password_reset_tokens_expira']
+  }
+}
+
 // Tabla externa de Supabase Auth (no se crea, solo referenciada)
 Table auth_users {
   id uuid [pk, note: 'Gestionada por Supabase Auth (auth.users)']
@@ -164,5 +180,5 @@ Table auth_users {
 // Objetos no representables como tablas en DBML:
 // - vista public_event_catalog
 // - funciones set_updated_at(), handle_new_user(), match_existing_events(jsonb),
-//   is_organizer_blocked(uuid) y publish_staged_catalog(...)
+//   is_organizer_blocked(uuid), cleanup_expired_events() y publish_staged_catalog(...)
 // - favorites fue eliminada por 20260924000100_user_recommendation_interactions.sql

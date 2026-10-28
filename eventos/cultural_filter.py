@@ -10,6 +10,7 @@ from pathlib import Path
 from .models import Event
 from .paths import OUTPUT_DIR
 from .text import normalized
+from .classification import classify_event, evidence_text
 
 
 # Dimensiones culturales amplias. Se evita usar por sí solas palabras ambiguas
@@ -39,6 +40,17 @@ INDUSTRY_TERMS = {
     "soluciones medicas", "tecnologia sanitaria",
 }
 
+NON_CULTURAL_TERMS = INDUSTRY_TERMS | {
+    "entrenamiento funcional", "basquetbol", "basquetball", "futbol", "natacion",
+    "gimnasia", "fitness", "pilates", "dia de spa", "orcid", "vacunacion",
+    "control de salud", "acompanamiento telefonico", "servicio de acompanamiento",
+}
+PRIMARY_SPORT_TERMS = {
+    "basquetbol", "basquetball", "futbol", "natacion", "gimnasia", "fitness",
+    "entrenamiento funcional", "zumba", "aerobox", "pilates", "acondicionamiento fisico",
+    "boxeo", "voleibol", "volleyball", "tenis", "dia de spa",
+}
+
 
 @dataclass(frozen=True)
 class CulturalDecision:
@@ -54,59 +66,59 @@ def _matches(text: str, terms: set[str]) -> tuple[str, ...]:
         sorted(
             term
             for term in terms
-            if re.search(rf"(?:^|\s){re.escape(term)}(?:$|\s)", text)
+            if re.search(rf"(?<!\w){re.escape(term)}(?!\w)", text)
         )
     )
 
 
 def assess_cultural_relevance(event: Event) -> CulturalDecision:
     """Clasifica como aceptado, revisión o excluido con una razón auditable."""
-    text = normalized(" ".join([
-        event.title,
-        " ".join(event.categories),
-        event.description,
-        event.organizer,
-        event.source_name,
-    ]))
-    cultural = _matches(text, CULTURAL_TERMS)
+    metadata = classify_event(event)
+    # La reputación/nombre de una institución no demuestra el contenido del evento.
+    text = normalized(evidence_text(event))
+    cultural = _matches(text, CULTURAL_TERMS - {"cultura", "cultural", "territorio", "memoria", "tradicional", "cafe", "museo"})
     public_program = _matches(text, PUBLIC_PROGRAM_TERMS)
-    industry = _matches(text, INDUSTRY_TERMS)
+    industry = _matches(text, NON_CULTURAL_TERMS)
 
-    if cultural:
-        return CulturalDecision(
-            event, "accepted", "Presenta una dimensión cultural explícita.", cultural, industry
-        )
+    def result(decision, reason):
+        metadata.update(decision=decision, reason=reason)
+        return CulturalDecision(event, decision, reason, cultural, industry)
+
+    if metadata["content_kind"] == "directory":
+        return result("excluded", "Ficha de directorio/espacio cultural, no una ocurrencia de evento.")
+
+    title = normalized(event.title)
+    primary_sport = _matches(title, PRIMARY_SPORT_TERMS)
+    explicit_art = _matches(title, {"concierto", "danza", "cueca", "folclor", "teatro", "exposicion", "patrimonio"})
+    if primary_sport and not explicit_art:
+        return result("excluded", "La finalidad principal publicada es deportiva/bienestar; la música de acompañamiento no la convierte en una actividad artística.")
+    if _matches(title, {"kung fu", "kung-fu", "karate", "taekwondo"}) and not explicit_art:
+        return result("review", "Actividad marcial: debe verificarse si es práctica deportiva o una manifestación cultural; una mención incidental de filosofía no basta.")
+
+    if event.categories:
+        return result("accepted", "Presenta contenido o una disciplina cultural explícita; no se usa el nombre de la fuente.")
     if industry:
-        return CulturalDecision(
-            event,
-            "excluded",
-            "Predomina una finalidad industrial o comercial sin dimensión cultural explícita.",
-            cultural,
-            industry,
-        )
+        return result("excluded", "Predomina una actividad deportiva, de servicio, académica técnica o comercial sin dimensión cultural explícita.")
     if public_program:
-        return CulturalDecision(
-            event,
-            "review",
-            "Es una actividad pública, pero la información no permite afirmar su dimensión cultural.",
-            cultural,
-            industry,
-        )
-    return CulturalDecision(
-        event,
-        "review",
-        "No hay evidencia suficiente para aceptar ni excluir automáticamente.",
-        cultural,
-        industry,
-    )
+        return result("review", "Es una actividad pública, pero falta evidencia de su contenido cultural.")
+    if cultural:
+        return result("review", "Hay indicios culturales, pero falta una disciplina verificable.")
+    return result("review", "No hay evidencia suficiente para aceptar ni excluir automáticamente.")
 
 
 def filter_cultural_events(
-    events: list[Event], *, review_action: str = "keep"
+    events: list[Event], *, review_action: str = "quarantine"
 ) -> tuple[list[Event], list[CulturalDecision]]:
-    """Aplica el filtro. Los casos grises se conservan por defecto para evitar pérdidas."""
+    """Los casos grises se conservan como borrador, nunca publicados por defecto."""
+    if review_action not in {"keep", "exclude", "quarantine"}:
+        raise ValueError("cultural_review_action debe ser keep, exclude o quarantine")
     decisions = [assess_cultural_relevance(event) for event in events]
     keep_review = review_action.casefold() != "exclude"
+    for item in decisions:
+        item.event.classification["publication_status"] = (
+            "draft" if item.decision == "review" and review_action == "quarantine"
+            else "archived" if item.decision == "excluded" else "published"
+        )
     accepted = [
         item.event
         for item in decisions

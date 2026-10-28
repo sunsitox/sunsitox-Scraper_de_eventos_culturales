@@ -77,7 +77,7 @@ class Settings:
     target_regions: tuple[str, ...] = ()
     include_unknown_region: bool = False
     cultural_filter_enabled: bool = True
-    cultural_review_action: str = "keep"
+    cultural_review_action: str = "quarantine"
     retired_source_names: tuple[str, ...] = ()
 
     @classmethod
@@ -87,7 +87,7 @@ class Settings:
             target_regions=tuple(payload.get("target_regions", [])),
             include_unknown_region=bool(payload.get("include_unknown_region", False)),
             cultural_filter_enabled=bool(payload.get("cultural_filter_enabled", True)),
-            cultural_review_action=str(payload.get("cultural_review_action", "keep")),
+            cultural_review_action=str(payload.get("cultural_review_action", "quarantine")),
             retired_source_names=tuple(
                 str(name) for name in payload.get("retired_source_names", []) if str(name).strip()
             ),

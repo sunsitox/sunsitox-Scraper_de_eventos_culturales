@@ -46,8 +46,28 @@ class CulturalFilterTests(unittest.TestCase):
         kept, decisions = filter_cultural_events([event], review_action="keep")
         self.assertEqual(kept, [event])
         self.assertEqual(decisions[0].decision, "review")
+        self.assertEqual(event.classification["publication_status"], "published")
+        self.assertEqual(event.classification["review_action"], "keep")
         excluded, _ = filter_cultural_events([event], review_action="exclude")
         self.assertEqual(excluded, [])
+
+    def test_keep_preserves_accepted_review_and_excluded_distinction(self):
+        accepted = Event(title="Concierto de jazz")
+        review = Event(title="Encuentro ciudadano")
+        directory = Event(title="Librería L", categories=["Guía de Librerías"])
+        sport = Event(title="Entrenamiento funcional")
+        kept, decisions = filter_cultural_events([accepted, review, directory, sport], review_action="keep")
+        self.assertEqual(kept, [accepted, review])
+        self.assertEqual([d.decision for d in decisions], ["accepted", "review", "excluded", "excluded"])
+        self.assertEqual([e.classification["publication_status"] for e in (accepted, review, directory, sport)],
+                         ["published", "published", "archived", "archived"])
+        self.assertEqual(review.categories, [])
+
+    def test_repository_policy_publishes_reviews_without_disabling_filter(self):
+        from eventos.config import Settings
+        settings = Settings.load()
+        self.assertTrue(settings.cultural_filter_enabled)
+        self.assertEqual(settings.cultural_review_action, "keep")
 
 
 if __name__ == "__main__":

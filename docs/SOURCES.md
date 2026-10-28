@@ -1,6 +1,6 @@
 # Fuentes de datos del agregador de eventos culturales
 
-**Actualización:** 27 de octubre de 2026
+**Actualización:** 28 de octubre de 2026
 **Cobertura:** las 16 regiones de Chile mediante Chile Cultura, complementadas por agendas
 municipales, culturales, universitarias, vinícolas y de exposiciones.
 
@@ -35,11 +35,11 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
 | [Ticketplus · Chile](https://ticketplus.cl/states/region-metropolitana) | Carteleras de las 16 regiones | Selector regional público, fichas estructuradas y filtro cultural global |
 | [Corporación Cultural de Iquique](https://culturaiquique.cl/) | Programación cultural de Tarapacá | Tarjetas institucionales con fechas, categorías y fichas oficiales |
 | [Centro de Arte Molino Machmar](https://www.molinomachmar.cl/cartelera/) | Artes visuales, música, literatura y artes escénicas en Puerto Varas | Tarjetas institucionales con fechas abreviadas y fichas oficiales |
-| [Teatro del Lago](https://teatrodellago.cl/agenda-eventos/) | Música, danza, exposiciones y formación en Frutillar, Los Lagos | API pública The Events Calendar paginada |
+| [Museo de la Memoria y los Derechos Humanos](https://mmdh.cl/cartelera) | Actividades culturales, memoria, cine y literatura en Santiago | API pública Strapi paginada; fechas ISO y texto original |
 | [Teatro Municipal de Chillán](https://teatrochillan.cl/cartelera/) | Teatro, conciertos, danza, cine y humor en Ñuble | Sección de próximos eventos; fecha con año y hora en la ficha |
 | [Teatro Regional Cervantes](https://www.teatroregionalcervantes.cl/cartelera/) | Cine, música, danza y artes escénicas en Valdivia, Los Ríos | Tarjetas HTML con fecha completa, categorías y enlaces individuales |
 | [Corporación Cultural de Puerto Montt](https://culturapuertomontt.cl/cartelera/) | Programación de los espacios de la corporación en Puerto Montt, Los Lagos | Cartelera móvil de los próximos 30 días; descripción, imagen y organizador explícito desde la ficha |
-| [Teatro Oriente](https://teatrooriente.cl/cartelera-eventos/) | Cine, teatro, conciertos, humor y temporadas líricas en Providencia | Cartelera HTML y fechas ISO del JSON-LD público; no consulta la API protegida |
+| [Teatro Regional del Maule](https://www.teatroregional.cl/cartelera) | Programación de Sala TRM en Talca; no extensiones en otras comunas | Cartelera HTML y fichas con año explícito; detención antes del archivo histórico |
 
 ## Criterios de tratamiento
 
@@ -81,6 +81,29 @@ de exclusión de la fuente u organizador. El inventario Excel conserva su audito
 esta ampliación se documenta aquí y en los JSON ejecutables, sin asignarle un puntaje técnico
 histórico que no haya sido recalculado.
 
-## Fuente retirada
+## Reemplazos del 28-10-2026
+
+Teatro del Lago y Teatro Oriente se retiraron por HTTP 403 reproducido desde GitHub Actions.
+Se reemplazaron por Museo de la Memoria y Teatro Regional del Maule, sin aumentar las 27
+configuraciones. El museo utiliza `https://manager.mmdh.cl/api/post-carteleras`, el mismo
+endpoint público de su cartelera, con paginación y sin credenciales. Los campos de fecha
+son ISO UTC; no se usa la fecha de publicación como fecha del evento.
+
+La validación local, con TLS y un segundo entre peticiones, obtuvo cinco eventos vigentes
+del museo y seis de Maule, sin NVIDIA ni escrituras en Supabase. Maule mantiene fichas sin
+año explícito: se omiten, la fuente queda parcial y no habilita borrados por ausencia. Se
+limita a Sala TRM para no asignar Talca a las extensiones regionales. El acceso desde el
+runner todavía debe comprobarse: una respuesta HTTP 200 local no lo garantiza.
+
+Ticketplus conserva ahora la descripción original completa del bloque de detalle y sus
+etiquetas Disciplina/Género. No toma categorías del carrusel de relacionados. La corrección
+actualiza su configuración y obliga a renovar sus fichas en la siguiente fase de extracción;
+no borra las colas OCR ni obliga a repetir redacciones cuyo contenido no cambió.
+
+## Fuentes retiradas
 
 Rancagua Cultura se retiró el 25 de septiembre de 2026 porque la cartelera devolvió HTTP 403 desde GitHub Actions. `settings.json` conserva su nombre en `retired_source_names`: en la siguiente sincronización exitosa, Supabase retirará únicamente los eventos que todavía pertenezcan a esa fuente. No se elimina información de ninguna otra fuente.
+
+La lista de retiradas incluye ahora Teatro del Lago y Teatro Oriente. La conciliación respeta
+las protecciones existentes para eventos manuales, supresiones e interacciones; no equivale
+a borrar indiscriminadamente todos los registros asociados.

@@ -109,6 +109,7 @@ def spanish_flexible_range(value: str, current=None) -> tuple[str, str]:
         return normal_date(text), ""
 
     today = current or chile_now()
+    explicit_years = re.findall(r"\b((?:19|20)\d{2})\b", text)
     clocks = re.findall(r"(?<!\d)(\d{1,2})[.:](\d{2})(?!\d)", text)
     start_clock = f"{int(clocks[0][0]):02d}:{clocks[0][1]}" if clocks else "00:00"
     end_clock = f"{int(clocks[-1][0]):02d}:{clocks[-1][1]}" if clocks else start_clock
@@ -117,7 +118,7 @@ def spanish_flexible_range(value: str, current=None) -> tuple[str, str]:
         start_day, end_day, month_name = same_month.groups()
         month_alias = month_name[:3].lower().replace("set", "sep")
         start_month = list(ABBREVIATED_SPANISH_MONTHS).index(month_alias) + 1
-        start_year = today.year + int(today.month - start_month >= 6)
+        start_year = int(explicit_years[-1]) if explicit_years else today.year + int(today.month - start_month >= 6)
         return (
             parse_spanish_datetime(start_day, month_name, str(start_year), start_clock),
             parse_spanish_datetime(end_day, month_name, str(start_year), end_clock),
@@ -127,7 +128,7 @@ def spanish_flexible_range(value: str, current=None) -> tuple[str, str]:
     start_day, start_month_name = first.groups()
     start_alias = start_month_name[:3].lower().replace("set", "sep")
     start_month = list(ABBREVIATED_SPANISH_MONTHS).index(start_alias) + 1
-    start_year = today.year + int(today.month - start_month >= 6)
+    start_year = int(explicit_years[0]) if explicit_years else today.year + int(today.month - start_month >= 6)
     start = parse_spanish_datetime(start_day, start_month_name, str(start_year), start_clock)
     if len(full_dates) == 1:
         return start, ""
@@ -136,7 +137,14 @@ def spanish_flexible_range(value: str, current=None) -> tuple[str, str]:
     end_day, end_month_name = last.groups()
     end_alias = end_month_name[:3].lower().replace("set", "sep")
     end_month = list(ABBREVIATED_SPANISH_MONTHS).index(end_alias) + 1
-    end_year = start_year + int(end_month < start_month)
+    # En «28 de diciembre al 3 de enero de 2027», el único año pertenece
+    # al extremo final; no desplazar todo el rango un año hacia el futuro.
+    if len(explicit_years) == 1 and end_month < start_month:
+        year_match = re.search(r"\b(?:19|20)\d{2}\b", text)
+        if year_match and year_match.start() >= last.end():
+            start_year -= 1
+            start = parse_spanish_datetime(start_day, start_month_name, str(start_year), start_clock)
+    end_year = int(explicit_years[-1]) if len(explicit_years) > 1 else start_year + int(end_month < start_month)
     end = parse_spanish_datetime(end_day, end_month_name, str(end_year), end_clock)
     return start, end
 
@@ -203,6 +211,14 @@ class HtmlCardsConnector(Connector):
                 logging.warning("%s: no se pudo completar una página de la cartelera", source.name)
                 break
             soup = BeautifulSoup(html or "", "html.parser")
+            end_selector = source.get("listing_end_selector")
+            if end_selector:
+                marker = soup.select_one(end_selector)
+                if marker is None:
+                    raise ValueError(f"{source.name}: desapareció el límite del archivo histórico")
+                for sibling in list(marker.next_siblings):
+                    sibling.extract()
+                marker.decompose()
             cards = soup.select(card_selector)
             if not cards and not source.get("allow_empty_listing", False):
                 if len(visited) == 1:
@@ -221,6 +237,7 @@ class HtmlCardsConnector(Connector):
         selectors = source.get("selectors", {})
         results: list[Event] = []
         seen = set()
+        details = {}
         for card, page_url in self._cards(source):
             card_text = clean(card.get_text(" "))
             if source.get("exclude_card_pattern") and re.search(source["exclude_card_pattern"], card_text, re.I):
@@ -229,13 +246,18 @@ class HtmlCardsConnector(Connector):
             source_url = urljoin(page_url, values.get("source_url", "")) or page_url
             if source.get("detail_selectors") or source.get("detail_jsonld_fields"):
                 try:
-                    values.update(detail_values(self.http, source, source_url))
+                    if source_url not in details:
+                        details[source_url] = detail_values(self.http, source, source_url)
+                    values.update(details[source_url])
                 except (requests.RequestException, ValueError) as exc:
                     status = exc.response.status_code if isinstance(exc, requests.RequestException) and exc.response is not None else 0
                     if status not in {404, 410}:
                         self.collection_complete = False
                     logging.warning("%s: ficha omitida %s: %s", source.name, source_url, exc)
                     continue
+            if any(not re.search(pattern, values.get(field, ""), re.I)
+                   for field, pattern in source.get("detail_include_patterns", {}).items()):
+                continue
             title_remove_pattern = clean(source.get("title_remove_pattern"))
             if title_remove_pattern and values.get("title"):
                 try:
@@ -266,7 +288,7 @@ class HtmlCardsConnector(Connector):
                 start_date = f"{start_date} {values['start_time']}"
             if values.get("end_time"):
                 end_date = f"{date_for_end} {values['end_time']}"
-            free = bool(re.search(r"gratis|gratuit|entrada liberada", card_text, re.I))
+            free = bool(re.search(r"gratis|gratuit|entrada liberada", card_text + " " + values.get("price", ""), re.I))
             event = Event(
                 title=values.get("title", ""),
                 start_date=normal_date(start_date),

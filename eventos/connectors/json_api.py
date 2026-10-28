@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urljoin
 
 from ..config import SourceConfig
 from ..mapping import event_from_values, get_path, map_fields
@@ -59,6 +60,9 @@ class JsonApiConnector(Connector):
                 if not isinstance(row, dict):
                     continue
                 values = map_fields(row, field_map)
+                for field, base in source.get("field_url_bases", {}).items():
+                    if values.get(field):
+                        values[field] = urljoin(base, clean(values[field]))
                 event = event_from_values(
                     values,
                     source,

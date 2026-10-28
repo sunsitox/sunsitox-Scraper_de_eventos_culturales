@@ -109,12 +109,17 @@ def assess_cultural_relevance(event: Event) -> CulturalDecision:
 def filter_cultural_events(
     events: list[Event], *, review_action: str = "quarantine"
 ) -> tuple[list[Event], list[CulturalDecision]]:
-    """Los casos grises se conservan como borrador, nunca publicados por defecto."""
+    """Clasificación y publicación son distintas: keep no convierte review en accepted.
+
+    quarantine conserva la revisión como borrador; keep permite publicarla.
+    Las supresiones administrativas se comprueban después, en Supabase.
+    """
     if review_action not in {"keep", "exclude", "quarantine"}:
         raise ValueError("cultural_review_action debe ser keep, exclude o quarantine")
     decisions = [assess_cultural_relevance(event) for event in events]
     keep_review = review_action.casefold() != "exclude"
     for item in decisions:
+        item.event.classification["review_action"] = review_action
         item.event.classification["publication_status"] = (
             "draft" if item.decision == "review" and review_action == "quarantine"
             else "archived" if item.decision == "excluded" else "published"

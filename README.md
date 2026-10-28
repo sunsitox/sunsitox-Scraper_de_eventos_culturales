@@ -17,11 +17,11 @@ El recolector tiene **26 fuentes permanentes y una fuente estacional de septiemb
 | Agenda Universidad de Talca | Maule | Tarjetas HTML declarativas |
 | Corporación Cultural de Iquique | Tarapacá | Tarjetas institucionales declarativas |
 | Centro de Arte Molino Machmar | Los Lagos | Tarjetas institucionales declarativas |
-| Teatro del Lago | Los Lagos, Frutillar | The Events Calendar API |
+| Museo de la Memoria y los Derechos Humanos | Metropolitana, Santiago | API pública Strapi paginada |
 | Teatro Municipal de Chillán | Ñuble | Cartelera y fichas con año explícito |
 | Teatro Regional Cervantes | Los Ríos | Tarjetas HTML con fecha completa |
 | Corporación Cultural de Puerto Montt | Los Lagos | Cartelera oficial móvil de 30 días y fichas |
-| Teatro Oriente | Metropolitana, Providencia | Cartelera HTML y JSON-LD de las fichas |
+| Teatro Regional del Maule | Maule, Talca | Cartelera y fichas con año explícito; Sala TRM |
 | Enoturismo Chile · Agenda | Cobertura interregional | WordPress + EventON + taxonomías vinícolas |
 | FISA · Ferias y Exposiciones | Varias regiones | Portafolio oficial FISA |
 | Espacio Riesco · Calendario | Metropolitana | Tarjetas HTML declarativas |
@@ -37,6 +37,11 @@ Santiago revisa el índice completo y reutiliza detalles sin cambios; Ticketplus
 los enlaces de su cartelera y revalida detalles cada 24 horas. La primera extracción puede
 seguir siendo larga. Ambas pasan por el filtro cultural común.
 
+El 28-10-2026 se sustituyeron Teatro del Lago y Teatro Oriente por sus bloqueos HTTP 403
+desde Actions. Los reemplazos tienen acceso local comprobado; falta verificar su acceso
+desde el runner. Maule omite fichas sin año verificable y queda parcial ante esas omisiones;
+no se inventan fechas ni se autoriza conciliación de una fuente parcial.
+
 ## Pipeline reanudable
 
 ### Clasificación cultural y corrección del catálogo
@@ -50,13 +55,52 @@ públicos, programas, versión, evidencia y decisión. «CONCIERTO» aporta Mús
 Las guías/directorios de espacios se excluyen antes de consumir IA. Una duración larga por sí
 sola no excluye una actividad. El nombre de la fuente/organizador no demuestra pertinencia
 cultural. El entrenamiento deportivo con música incidental no se transforma en concierto.
-Los casos ambiguos se conservan en revisión como `draft`, no publicados. El frontend debe leer
-solo `status=published` con las credenciales públicas y RLS, nunca una clave `service_role`.
+La política activa es `cultural_review_action=keep`: los casos ambiguos vigentes se pueden
+publicar, pero conservan `classification.decision=review`; no se convierten en aceptados ni
+reciben categorías inventadas. `quarantine` sigue disponible como política alternativa para
+dejarlos en `draft`. Los directorios y demás exclusiones siguen fuera del catálogo público.
+El frontend debe leer solo `status=published`, respetando RLS y `is_suppressed=false`, con
+credenciales públicas, nunca una clave `service_role`.
+
+### Clasificación y control administrativo de visibilidad
+
+- **Clasificación automática:** `event_provenance.classification.decision` conserva
+  `accepted`, `review` o `excluded`, junto con la evidencia. Un evento visible puede seguir
+  pendiente de revisión.
+- **Publicación:** `events.status` indica su ciclo de publicación; no sustituye la clasificación.
+- **Ocultación administrativa persistente:** `events.is_suppressed=true` impide mostrarlo.
+  El scraper no sobrescribe esta columna y omite el evento en el enriquecimiento/publicación.
+  Para volver a mostrarlo se desmarca esa supresión, sin convertir por ello su clasificación
+  en aceptada; todavía debe cumplir vigencia, publicación y los demás controles.
+
+El panel debe ofrecer filtros por clasificación y por visibilidad, y acciones separadas para
+ocultar/volver a mostrar. Su backend debe verificar el rol `admin` antes de leer la procedencia
+privada o modificar la supresión; `visitor` no obtiene permisos de moderación. No basta con
+ocultar un botón en la interfaz. Estos son los campos/contrato de integración: esta revisión
+del scraper **no implementa ni verifica los controles del panel web** y no amplía RLS.
 
 Ticketplus usa primero título, texto original y OCR disponible. Solo las disciplinas aún
 ambiguas consultan NVIDIA: máximo 100 candidatos por ejecución, lotes de 10, presupuesto de
 5 minutos, máximo 3 fallos consecutivos y el mismo límite global de 40 RPM. Las asignaciones
 deben pertenecer a la lista permitida y citar evidencia literal; un fallo conserva la cola.
+
+Desde el 28-10-2026 Ticketplus completa su JSON-LD con el bloque propio
+`.event__detalle .description-content`, incluidos Disciplina/Género, sin leer el carrusel de
+relacionados ni solicitar otra página. Cambiar su JSON invalida solo sus checkpoints de fuente
+y detalles: la próxima ejecución debe incluir extracción, no únicamente `--phase process`
+sobre datos antiguos. Las reglas se revisan independientemente de la versión del esquema;
+no hace falta otra migración para esta corrección.
+
+El total final incluye publicables y borradores, no solo lo que se ve en la web. El resumen
+ahora separa ambos. En una comprobación de solo lectura del 28-10-2026 había 1.237 registros:
+577 publicados, 371 borradores y 289 archivados; 297 borradores eran de Ticketplus.
+Son una observación, no un conteo fijo ni evidencia de que todos deban publicarse. La migración
+`20261028000100_publish_existing_reviews.sql` publicó de forma acotada los 369 borradores
+automáticos vigentes y elegibles, conservando `decision=review`. La verificación posterior
+registró 946 publicados, 2 borradores y los mismos 289 archivados, sin borrar registros.
+La migración no altera esquema ni permisos y no restaura archivados, cancelados, manuales,
+supresiones, organizadores bloqueados o fuentes inactivas/retiradas. Las sincronizaciones
+posteriores aplican `keep` y vuelven a clasificar con la evidencia actual.
 
 **Antes de sincronizar con esta versión**, aplica `20261027000100_cultural_classification.sql`.
 La comprobación de esquema falla antes de consumir IA si falta esa migración. La migración
@@ -73,6 +117,9 @@ actualiza categorías/procedencia y archiva rechazados o deja casos grises como 
 borrar eventos ni historial. Protege manuales, supresiones, organizadores bloqueados y fuentes
 inactivas; no elimina categorías antiguas que puedan tener referencias externas. Las reglas
 y los candidatos pendientes requieren revisión: no se promete una clasificación perfecta.
+Este mantenimiento es conservador (`quarantine`) y no es el mecanismo para publicar los casos
+en revisión. Para aplicar `keep` a los eventos extraídos se utiliza la sincronización normal;
+no se deben modificar todos los borradores manualmente ni ejecutar `--apply` para ese fin.
 
 Cada fuente y resultado de IA se guarda en `state/pipeline.sqlite3`. Las tareas OCR pendientes
 se recuperan en futuras ejecuciones; los resultados terminados se reutilizan por versión de entrada.

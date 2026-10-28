@@ -43,7 +43,7 @@ del scraper de eventos culturales de Chile\par}
 \vfill
 \begin{tabular}{rl}
 \textbf{Alcance:} & extracci\'{o}n, normalizaci\'{o}n y sincronizaci\'{o}n del cat\'{a}logo \\
-\textbf{Versi\'{o}n documental:} & 27 de octubre de 2026 \\
+\textbf{Versi\'{o}n documental:} & 28 de octubre de 2026 \\
 \textbf{Tecnolog\'{i}as principales:} & Python, Playwright, NVIDIA NIM, SQLite y Supabase \\
 \textbf{Ejecuci\'{o}n automatizada:} & GitHub Actions \\
 \end{tabular}
@@ -173,11 +173,11 @@ Teatro Biob\'{i}o & Biob\'{i}o & WordPress REST y fechas visibles \\
 Agenda Universidad de Talca & Maule & Tarjetas HTML declarativas \\
 Corporaci\'{o}n Cultural de Iquique & Tarapac\'{a} & Tarjetas institucionales \\
 Centro de Arte Molino Machmar & Los Lagos & Tarjetas institucionales \\
-Teatro del Lago & Los Lagos, Frutillar & The Events Calendar API \\
+Museo de la Memoria y los Derechos Humanos & Santiago & API p\'{u}blica Strapi paginada \\
 Teatro Municipal de Chill\'{a}n & \~{N}uble & Cartelera y fichas con a\~{n}o expl\'{i}cito \\
 Teatro Regional Cervantes & Los R\'{i}os & Tarjetas con fecha completa \\
 Corporaci\'{o}n Cultural de Puerto Montt & Los Lagos & Cartelera m\'{o}vil y fichas \\
-Teatro Oriente & Providencia & Cartelera HTML y JSON-LD \\
+Teatro Regional del Maule & Talca, Sala TRM & Cartelera y fichas con a\~{n}o expl\'{i}cito \\
 Enoturismo Chile & Interregional & WordPress/EventON \\
 FISA & Varias regiones & Portafolio oficial \\
 Espacio Riesco & Regi\'{o}n Metropolitana & Tarjetas HTML declarativas \\
@@ -194,6 +194,8 @@ FondasChile & Nacional, septiembre & Tarjetas HTML declarativas \\
 Cada archivo en \texttt{sources/} declara URL, regi\'{o}n, comuna, organizador, conector, categor\'{i}as por defecto, l\'{i}mites de paginaci\'{o}n y, cuando corresponda, metadatos est\'{a}ticos de ubicaci\'{o}n. A\~{n}adir una fuente no exige modificar el archivo principal: primero se intenta configurar un conector existente; solo se crea c\'{o}digo nuevo cuando la estructura no coincide con ninguno.
 
 Las cinco incorporaciones del 27 de octubre de 2026 se comprobaron mediante extracci\'{o}n local de solo lectura, sin NVIDIA ni Supabase. Entregaron 43 fichas vigentes antes de deduplicar contra el cat\'{a}logo: Lago 7, Chill\'{a}n 5, Cervantes 18, Puerto Montt 4 y Oriente 9. Son observaciones de esa prueba, no conteos permanentes ni una garant\'{i}a de acceso desde GitHub Actions. Puerto Montt publica una ventana m\'{o}vil de 30 d\'{i}as: no se afirma cubrir todo su archivo. Chill\'{a}n utiliza el a\~{n}o expl\'{i}cito de la ficha; Oriente utiliza fechas ISO del JSON-LD y excluye cancelaciones y avisos permanentes.
+
+El 28 de octubre se retiraron Teatro del Lago y Teatro Oriente por respuestas HTTP 403 desde Actions. Los sustituyen Museo de la Memoria y Teatro Regional del Maule, sin aumentar el total de configuraciones. El museo consulta la API p\'{u}blica Strapi utilizada por su cartelera, con fechas ISO UTC. Maule se limita inicialmente a Sala TRM en Talca, lee el a\~{n}o expl\'{i}cito y se detiene antes del archivo de eventos realizados. La prueba local obtuvo cinco y seis fichas vigentes, respectivamente. Maule qued\'{o} parcial por fichas sin fecha verificable: no se inventa el a\~{n}o ni se autoriza conciliaci\'{o}n de ausencias. El acceso desde el runner sigue pendiente de comprobaci\'{o}n.
 
 El conector de tarjetas admite selectores de detalle, campos JSON-LD y enlaces de paginaci\'{o}n configurables. Los detalles fallidos temporalmente, la p\'{e}rdida de campos obligatorios y los ciclos de paginaci\'{o}n marcan una extracci\'{o}n parcial, que no autoriza borrados por ausencia. Esta ampliaci\'{o}n est\'{a} documentada en los JSON ejecutables y \texttt{docs/SOURCES.md}; no modifica los resultados hist\'{o}ricos del inventario Excel.
 
@@ -247,6 +249,8 @@ Las categor\'{i}as son siempre una lista de disciplinas culturales, no una caden
 
 La revisi\'{o}n del 27 de octubre incorpora 18 disciplinas can\'{o}nicas y el objeto \texttt{classification}: versi\'{o}n, etiquetas originales, formatos, p\'{u}blicos, programas, evidencia y decisi\'{o}n. Se recalcula incluso para eventos conocidos y checkpoints; cambiar la taxonom\'{i}a no obliga a repetir OCR ni redacci\'{o}n. Gu\'{i}as de librer\'{i}as y fichas de espacios no se convierten en eventos por declarar una vigencia de varios a\~{n}os. Una duraci\'{o}n larga, por s\'{i} sola, no descarta una programaci\'{o}n real.
 
+La revisi\'{o}n de reglas del 28 de octubre se identifica independientemente del esquema mediante \path|rules_revision| e invalida solamente las evidencias de clasificaci\'{o}n incompatibles. Ticketplus completa el JSON-LD con la descripci\'{o}n propia de la ficha y sus etiquetas Disciplina/G\'{e}nero, sin tomar texto de relacionados ni efectuar otra solicitud HTTP. Se conservan los controles contra deportes, servicios y directorios. Se reconocen adem\'{a}s evidencias expl\'{i}citas como canto, collage e instalaci\'{o}n sonora. No requiere una nueva migraci\'{o}n SQL.
+
 La ubicaci\'{o}n se resuelve de forma transparente y cada evento incluye:
 \begin{itemize}
   \item \texttt{location}: texto can\'{o}nico que nunca queda vac\'{i}o;
@@ -262,11 +266,21 @@ El saneador com\'{u}n elimina HTML residual, reglas CSS, scripts, shortcodes de 
 
 Un evento se conserva solo si tiene fecha de inicio v\'{a}lida y todav\'{i}a est\'{a} vigente. La validaci\'{o}n de URL retira fichas confirmadas con HTTP 404/410 o p\'{a}ginas de error inequ\'{i}vocas; ante timeout, bloqueo temporal o error 5xx el registro se conserva para no borrar informaci\'{o}n por una falla pasajera.
 
-El filtro realiza una comprobaci\'{o}n antes de consumir IA y otra despu\'{e}s del enriquecimiento. Tiene tres resultados: \textit{aceptado}, \textit{revisi\'{o}n} y \textit{excluido}. Se exige contenido cultural verificable; el nombre de la fuente, organizador o recinto no basta. El formato por s\'{i} solo no determina el resultado. Los casos ambiguos se conservan como \texttt{draft}, no publicados. La m\'{u}sica de acompa\~{n}amiento no convierte una clase de fitness en concierto. La auditor\'{i}a queda en \texttt{data/cultural\_filter\_audit.json}.
+El filtro realiza una comprobaci\'{o}n antes de consumir IA y otra despu\'{e}s del enriquecimiento. Tiene tres resultados: \textit{aceptado}, \textit{revisi\'{o}n} y \textit{excluido}. Se exige contenido cultural verificable para aceptar; el nombre de la fuente, organizador o recinto no basta. La pol\'{i}tica activa es \path|cultural_review_action=keep|: los candidatos ambiguos vigentes pueden publicarse, conservando \path|classification.decision=review|. No se convierten en aceptados ni reciben categor\'{i}as inventadas. La alternativa \texttt{quarantine} los conserva en \texttt{draft}. Los directorios y dem\'{a}s exclusiones siguen fuera. La m\'{u}sica de acompa\~{n}amiento no convierte una clase de fitness en concierto. La auditor\'{i}a queda en \texttt{data/cultural\_filter\_audit.json}.
 
-Ticketplus y las dem\'{a}s fuentes usan primero reglas sobre el contenido. Solo los casos a\'{u}n ambiguos consultan NVIDIA, con categor\'{i}as permitidas y evidencia literal: lotes de 10, hasta 100 candidatos por corrida, cinco minutos adicionales de presupuesto y suspensi\'{o}n tras tres fallos consecutivos. Se mantiene el l\'{i}mite global de 40 RPM y se reutiliza evidencia compatible local o remota. Un fallo no inventa la categor\'{i}a Otros ni impide sincronizar los casos pendientes como borradores.
+Ticketplus y las dem\'{a}s fuentes usan primero reglas sobre el contenido. Solo los casos a\'{u}n ambiguos consultan NVIDIA, con categor\'{i}as permitidas y evidencia literal: lotes de 10, hasta 100 candidatos por corrida, cinco minutos adicionales de presupuesto y suspensi\'{o}n tras tres fallos consecutivos. Se mantiene el l\'{i}mite global de 40 RPM y se reutiliza evidencia compatible local o remota. Un fallo no inventa la categor\'{i}a Otros ni impide sincronizar los pendientes seg\'{u}n la pol\'{i}tica de publicaci\'{o}n activa.
 
 Esta versi\'{o}n requiere la migraci\'{o}n \path|20261027000100_cultural_classification.sql|. Instalarla no altera filas del cat\'{a}logo. La publicaci\'{o}n at\'{o}mica conserva los metadatos y archiva exclusiones ya existentes sin borrar interacciones. El comando \texttt{python -m tools.reclassify\_catalog} simula el mantenimiento sin NVIDIA; solo \texttt{--apply} habilita escritura despu\'{e}s de revisar la propuesta. Se protegen eventos manuales, supresiones, fuentes inactivas y organizadores bloqueados. El diccionario de base de datos documenta el campo privado \path|event_provenance.classification| y la RPC de mantenimiento.
+
+La herramienta de mantenimiento conserva su pol\'{i}tica restrictiva: los casos \texttt{review} quedan como borradores. No se utiliza \texttt{--apply} para hacer visibles esos casos. La sincronizaci\'{o}n normal es la que aplica \texttt{keep} a los eventos extra\'{i}dos, sin cambiar indiscriminadamente borradores manuales.
+
+Para el cat\'{a}logo existente se aplic\'{o} la migraci\'{o}n \path|20261028000100_publish_existing_reviews.sql|. Public\'{o} 369 borradores autom\'{a}ticos vigentes conservando \texttt{decision=review}, las categor\'{i}as y la evidencia. El conteo verificado qued\'{o} en 946 publicados, dos borradores y 289 archivados, con los mismos 1.237 registros. No modific\'{o} tablas ni permisos, no restaur\'{o} archivados/cancelados y respet\'{o} manuales, supresiones, organizadores bloqueados y fuentes inactivas/retiradas. Las comprobaciones de vigencia usan el reloj del servidor y el d\'{i}a de Santiago. Las cifras son una observaci\'{o}n, no una cantidad fija esperada.
+
+\subsection{Clasificaci\'{o}n y visibilidad administrativa}
+
+La clasificaci\'{o}n autom\'{a}tica no equivale a visibilidad. \path|event_provenance.classification.decision| mantiene aceptado, revisi\'{o}n o excluido; \path|events.status| mantiene el ciclo de publicaci\'{o}n. La columna existente \path|events.is_suppressed| controla una ocultaci\'{o}n administrativa persistente: con valor verdadero no se muestra el evento y el scraper no restablece esa columna. Desmarcarla no cambia la clasificaci\'{o}n ni elimina los requisitos de vigencia y publicaci\'{o}n.
+
+El panel debe filtrar por clasificaci\'{o}n y visibilidad y ofrecer acciones independientes para ocultar o volver a mostrar. Su backend debe comprobar el rol \texttt{admin} antes de leer la procedencia privada o modificar esa marca; no se entregan permisos de moderaci\'{o}n a \texttt{visitor} ni una clave secreta al navegador. Esta revisi\'{o}n prepara el contrato del scraper y verifica la persistencia de la supresi\'{o}n; no implementa ni valida la interfaz web del panel y no ampl\'{i}a las pol\'{i}ticas RLS.
 
 \section{IA, OCR y control de cuota}
 
@@ -413,6 +427,12 @@ En esa revisi\'{o}n del 20 de octubre, las nueve migraciones del scraper quedaro
 \subsection{Revisi\'{o}n del 27 de octubre de 2026}
 
 Se incorporaron las cinco fuentes descritas en la secci\'{o}n de fuentes y se reforz\'{o} el conector de tarjetas con lectura de detalles, fechas completas, JSON-LD y paginaci\'{o}n segura. Se mantuvieron los checkpoints y los presupuestos por etapa de IA. Las 178 pruebas de Python pasaron localmente, incluidos los casos de suspensi\'{o}n OCR, continuidad hacia el exportador simulado, recuperaci\'{o}n de pendientes, estructuras de las nuevas agendas y coherencia documental de fuentes y presupuestos. La prueba real de las cinco fuentes no utiliz\'{o} NVIDIA ni sincroniz\'{o} Supabase. No se afirma una ejecuci\'{o}n integral nueva en producci\'{o}n por haber pasado estas pruebas.
+
+\subsection{Revisi\'{o}n del 28 de octubre de 2026}
+
+Una consulta de solo lectura encontr\'{o} 1.237 registros en Supabase: 577 publicados, 371 borradores y 289 archivados; 297 borradores proced\'{i}an de Ticketplus. La ejecuci\'{o}n autom\'{a}tica hab\'{i}a terminado correctamente. La reducci\'{o}n visible no demostraba una p\'{e}rdida de todos esos registros, sino el efecto de la clasificaci\'{o}n y la cuarentena. No se publican todos los borradores en bloque.
+
+Se corrigieron los reemplazos de fuentes, la lectura del texto original de Ticketplus y la clasificaci\'{o}n determinista. El resumen diferencia publicables de borradores e identifica las revisiones visibles. Se activ\'{o} \texttt{keep} conservando la distinci\'{o}n de clasificaci\'{o}n y el control administrativo de visibilidad. Pasaron 225 pruebas locales de Python, incluidas las nuevas regresiones de supresi\'{o}n persistente. La validaci\'{o}n de fuentes no consumi\'{o} NVIDIA ni modific\'{o} Supabase. Para renovar la evidencia de Ticketplus debe ejecutarse tambi\'{e}n la fase de extracci\'{o}n: procesar solamente un archivo antiguo no obtiene su descripci\'{o}n completa. Su cambio de configuraci\'{o}n invalida sus checkpoints, sin borrar las colas de las otras fuentes. La siguiente sincronizaci\'{o}n normal podr\'{a} publicar los candidatos vigentes aceptados o en revisi\'{o}n que no est\'{e}n suprimidos ni bloqueados; el conteo final no se garantiza por adelantado.
 
 \section{Operaci\'{o}n y mantenimiento}
 

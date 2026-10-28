@@ -26,7 +26,7 @@ def selector_value(card, rule) -> str:
         selector = clean(rule.get("selector"))
         attribute = clean(rule.get("attribute")) or "text"
         options = rule
-    node = card.select_one(selector) if selector else None
+    node = card if selector == ":scope" else card.select_one(selector) if selector else None
     if not node:
         return ""
     value = clean(node.get_text(" ")) if attribute == "text" else clean(node.get(attribute, ""))
@@ -54,6 +54,9 @@ def detail_values(http, source, url):
     if not html:
         raise ValueError("La ficha de detalle no devolvió HTML")
     soup = BeautifulSoup(html, "html.parser")
+    for selector in source.get("detail_remove_selectors", []):
+        for node in soup.select(selector):
+            node.decompose()
     values = {}
     if jsonld_fields:
         candidates = extract_jsonld(html, source, url)

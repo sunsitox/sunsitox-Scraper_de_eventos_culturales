@@ -1,0 +1,37 @@
+{
+  "name": "Teatro Regional del Maule",
+  "url": "https://www.teatroregional.cl/cartelera",
+  "connector": "html_cards",
+  "region": "Región del Maule",
+  "commune": "Talca",
+  "organizer": "Teatro Regional del Maule",
+  "venue": "Teatro Regional del Maule",
+  "official": true,
+  "enabled": true,
+  "use_nvidia": false,
+  "max_results": 0,
+  "require_start_date": true,
+  "listing_end_selector": ".entry-content > p:has(img[src*='/realizados.']), .entry-content > p:-soup-contains('EVENTOS REALIZADOS')",
+  "detail_remove_selectors": [".post-navigation"],
+  "card_selector": ".entry-content a[href*='/archivo/']:has(img)",
+  "selectors": {
+    "title": ":scope",
+    "source_url": {"selector": ":scope", "attribute": "href"},
+    "image_url": {"selector": "img", "attribute": "src"}
+  },
+  "detail_selectors": {
+    "title": "h1.entry-title",
+    "date_range": {"selector": ".entry-content tr:has(td:-soup-contains('FECHA')) td:last-child", "pattern": "(.+\\b20\\d{2}\\b.*)"},
+    "start_time": {"selector": ".entry-content tr:has(td:-soup-contains('HORA')) td:last-child", "pattern": "(\\d{1,2}[.:]\\d{2})", "format": "time"},
+    "venue": ".entry-content tr:has(td:-soup-contains('LUGAR')) td:last-child",
+    "price": ".entry-content tr:has(td:-soup-contains('ENTRADAS')) td:last-child",
+    "audience": ".entry-content tr:has(td:-soup-contains('PÚBLICO')) td:last-child",
+    "description": ".entry-content"
+  },
+  "detail_required_fields": ["title", "date_range", "venue"],
+  "detail_include_patterns": {"venue": "\\b(?:SALA\\s+TRM|TEATRO\\s+REGIONAL\\s+DEL\\s+MAULE)\\b"},
+  "date_range_parser": "spanish_flexible",
+  "integration_status": "active",
+  "integration_verified_at": "2026-10-28",
+  "integration_note": "Reemplaza Teatro Oriente. Cartelera pública y fichas con año explícito; se detiene antes del archivo EVENTOS REALIZADOS. Alcance inicial: Sala TRM en Talca; excluye extensiones en otras comunas para no asignarles una ubicación incorrecta. Validación local HTTP, pendiente comprobar acceso desde GitHub Actions."
+}

@@ -9,6 +9,8 @@
   ],
   "max_pages": 0,
   "incremental": true,
+  "detail_description_selector": ".event__detalle .description-content",
+  "detail_category_patterns": ["(?:Disciplina|Género)\\s*:\\s*([^\\n]+)"],
   "detail_refresh_hours": 24,
   "max_results": 0,
   "use_nvidia": false,

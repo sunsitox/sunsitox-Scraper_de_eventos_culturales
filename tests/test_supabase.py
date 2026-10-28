@@ -69,6 +69,19 @@ class SupabaseBundleTests(unittest.TestCase):
             {row["id"] for row in second.categories},
         )
 
+    def test_visible_review_retains_classification_without_overwriting_admin_visibility(self):
+        from eventos.cultural_filter import filter_cultural_events
+        event = self.sample_event()
+        event.title = "Encuentro ciudadano"
+        event.categories = []
+        event.source_description = "Actividad por confirmar"
+        events, _ = filter_cultural_events([event], review_action="keep")
+        bundle = build_supabase_bundle(events)
+        self.assertEqual(bundle.events[0]["status"], "published")
+        self.assertEqual(bundle.event_provenance[0]["classification"]["decision"], "review")
+        self.assertEqual(bundle.event_provenance[0]["classification"]["review_action"], "keep")
+        self.assertNotIn("is_suppressed", bundle.events[0])
+
     def test_unparseable_dates_are_not_published(self):
         event = self.sample_event()
         event.start_date = "Fecha por confirmar"
@@ -108,6 +121,19 @@ class FakeSupabaseClient:
 
 
 class SupabaseExporterTests(unittest.TestCase):
+    def test_administrative_suppression_wins_over_keep_reviews_policy(self):
+        from unittest.mock import Mock
+        from eventos.cultural_filter import filter_cultural_events
+        event = SupabaseBundleTests().sample_event()
+        event.title, event.categories, event.source_description = "Encuentro ciudadano", [], "Actividad"
+        candidates, _ = filter_cultural_events([event], review_action="keep")
+        client = Mock()
+        client.blocked_organizer_names.return_value = set()
+        client.match_existing_events.return_value = {event.event_id: {"stored_is_suppressed": True}}
+        allowed, pending = SupabaseExporter(client).prepare_for_enrichment(candidates)
+        self.assertEqual(allowed, [])
+        self.assertEqual(pending, [])
+
     def test_rejected_existing_event_is_staged_for_archival_not_reinserted(self):
         from eventos.cultural_filter import filter_cultural_events
         client = FakeSupabaseClient()

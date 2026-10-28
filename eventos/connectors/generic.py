@@ -13,7 +13,7 @@ from ..config import SourceConfig
 from ..extractors import extract_jsonld
 from ..models import Event
 from ..services import NvidiaExtractor
-from ..text import clean, is_upcoming
+from ..text import clean, clean_list, is_upcoming, text_from_html
 from ..state import DetailCache
 from .base import Connector
 from .registry import register_connector
@@ -59,6 +59,31 @@ def candidate_links(
         if limit > 0 and len(candidates) >= limit:
             break
     return candidates
+
+
+def augment_detail(events: list[Event], html: str, source: SourceConfig) -> None:
+    """Completa una ficha inequívoca sin volver a descargarla ni leer relacionados."""
+    selector = source.get("detail_description_selector")
+    if not selector or len(events) != 1:
+        return
+    soup = BeautifulSoup(html, "html.parser")
+    nodes = soup.select(selector)
+    if len(nodes) != 1:
+        return
+    node = nodes[0]
+    for unwanted in node.select("script, style, nav, footer, aside"):
+        unwanted.decompose()
+    original = text_from_html(str(node))
+    if not original:
+        return
+    event = events[0]
+    event.description = event.source_description = original
+    # Las etiquetas se buscan sólo dentro de la descripción propia de la ficha.
+    lines = node.get_text("\n", strip=True)
+    for pattern in source.get("detail_category_patterns", []):
+        for match in re.finditer(pattern, lines, re.I):
+            if match.lastindex:
+                event.categories = clean_list(event.categories + [clean(match.group(1))])
 
 
 @register_connector("generic")
@@ -115,6 +140,7 @@ class GenericConnector(Connector):
                 logging.warning("Ficha sin HTML omitida en %s: %s", source.name, page_url)
                 continue
             structured = extract_jsonld(page_html, source, page_url)
+            augment_detail(structured, page_html, source)
             if structured:
                 events.extend(structured)
             elif use_nvidia:

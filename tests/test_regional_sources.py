@@ -28,7 +28,7 @@ class NewRegionalSourcesTests(unittest.TestCase):
             self.addCleanup(current.stop)
 
     def collect(self, name, pages):
-        source = self.sources[name]
+        source = self.sources[name] if isinstance(name, str) else name
         http = Mock()
         http.get_html.side_effect = lambda url, **kwargs: pages[url]
         connector = ConnectorFactory(http).create(source)
@@ -40,8 +40,8 @@ class NewRegionalSourcesTests(unittest.TestCase):
         return connector, events, http
 
     def test_five_new_sources_are_enabled_without_llm_extraction(self):
-        names = {"Teatro del Lago", "Teatro Municipal de Chillán", "Teatro Regional Cervantes",
-                 "Corporación Cultural de Puerto Montt", "Teatro Oriente"}
+        names = {"Museo de la Memoria y los Derechos Humanos", "Teatro Municipal de Chillán", "Teatro Regional Cervantes",
+                 "Corporación Cultural de Puerto Montt", "Teatro Regional del Maule"}
         self.assertGreaterEqual(len(self.sources), 27)
         for name in names:
             source = self.sources[name]
@@ -103,7 +103,12 @@ class NewRegionalSourcesTests(unittest.TestCase):
         self.assertEqual(events[0].is_free, "true")
 
     def test_oriente_uses_iso_dates_from_jsonld_and_excludes_cancelled_cards(self):
-        source = self.sources["Teatro Oriente"]
+        # Regresión del conector reutilizable, aunque la fuente quedó retirada por 403.
+        source = SourceConfig.from_dict({"name": "Teatro Oriente", "url": "https://teatrooriente.cl/cartelera-eventos/",
+            "connector": "html_cards", "card_selector": ".upcoming-event-wrap .type-tribe_events",
+            "selectors": {"title": ".tribe-events-list-event-title a", "source_url": {"selector": ".tribe-events-list-event-title a", "attribute": "href"}},
+            "exclude_card_pattern": "cancelad|Monumento nacional",
+            "detail_jsonld_fields": ["start_date", "end_date"], "detail_required_fields": ["start_date"]})
         detail = "https://teatrooriente.cl/evento/temporada/"
         listing = f'''<div class="upcoming-event-wrap"><div class="type-tribe_events">
         <h2 class="tribe-events-list-event-title"><a href="{detail}">Temporada lírica</a></h2></div>
@@ -112,14 +117,15 @@ class NewRegionalSourcesTests(unittest.TestCase):
         node = {"@type": "Event", "name": "Temporada lírica", "url": detail,
                 "startDate": "2026-12-02T19:00:00-03:00", "endDate": "2027-07-06T21:00:00-04:00"}
         page = '<script type="application/ld+json">' + json.dumps([node]) + '</script>'
-        _, events, http = self.collect(source.name, {source.url: listing, detail: page})
+        _, events, http = self.collect(source, {source.url: listing, detail: page})
         self.assertEqual(http.get_html.call_count, 2)
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].start_date, node["startDate"])
         self.assertEqual(events[0].end_date, node["endDate"])
 
     def test_teatro_del_lago_reads_all_api_pages_and_sanitizes_content(self):
-        source = self.sources["Teatro del Lago"]
+        source = SourceConfig.from_dict({"name": "Teatro del Lago", "url": "https://teatrodellago.cl/agenda-eventos/",
+            "connector": "tribe_events_api", "api_url": "https://teatrodellago.cl/wp-json/tribe/events/v1/events"})
         http = Mock()
         row = {"title": "Música &amp; danza", "start_date": "2026-11-07 19:00:00",
                "end_date": "2026-11-07 21:00:00", "url": "https://teatrodellago.cl/evento/uno/",

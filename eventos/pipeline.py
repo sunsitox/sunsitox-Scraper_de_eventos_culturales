@@ -346,6 +346,23 @@ class EventPipeline:
         for event in events:
             by_source[event.source_name] = by_source.get(event.source_name, 0) + 1
         logging.info("Listo: %s eventos únicos", len(events))
+        draft_count = sum(event.classification.get("publication_status") == "draft" for event in events)
+        logging.info(
+            "Catálogo de esta ejecución: %s publicables y %s borradores en revisión; "
+            "el total incluye ambos y no equivale al contador público de la web.",
+            len(events) - draft_count, draft_count,
+        )
+        visible_reviews = sum(
+            event.classification.get("decision") == "review"
+            and event.classification.get("publication_status") == "published"
+            for event in events
+        )
+        if visible_reviews:
+            logging.info(
+                "De los publicables, %s siguen clasificados en revisión; "
+                "no se han marcado como aceptados. La exclusión administrativa prevalece.",
+                visible_reviews,
+            )
         logging.info("Regiones incluidas: %s", ", ".join(settings.target_regions))
         logging.info(
             "Precisión de ubicación: %s",

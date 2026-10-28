@@ -14,7 +14,11 @@ def get_path(payload: Any, path: str) -> Any:
     if not path:
         return payload
     current = payload
-    for part in path.split("."):
+    parts = path.split(".")
+    for index, part in enumerate(parts):
+        if part == "*" and isinstance(current, list):
+            rest = ".".join(parts[index + 1:])
+            return [get_path(item, rest) for item in current]
         if isinstance(current, list):
             try:
                 current = current[int(part)]
@@ -31,6 +35,12 @@ def map_fields(payload: Any, field_map: dict[str, Any]) -> dict[str, Any]:
     """Mapea cada campo; una lista de rutas funciona como cadena de alternativas."""
     values: dict[str, Any] = {}
     for field, configured_path in field_map.items():
+        if isinstance(configured_path, dict):
+            value = get_path(payload, configured_path.get("path", ""))
+            if isinstance(value, list) and "join" in configured_path:
+                value = str(configured_path["join"]).join(str(item) for item in value if isinstance(item, str) and item)
+            values[field] = value
+            continue
         paths = configured_path if isinstance(configured_path, list) else [configured_path]
         value: Any = ""
         for path in paths:

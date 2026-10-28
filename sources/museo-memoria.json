@@ -1,0 +1,43 @@
+{
+  "name": "Museo de la Memoria y los Derechos Humanos",
+  "url": "https://mmdh.cl/cartelera",
+  "connector": "json_api",
+  "api_url": "https://manager.mmdh.cl/api/post-carteleras",
+  "region": "Región Metropolitana de Santiago",
+  "commune": "Santiago",
+  "organizer": "Museo de la Memoria y los Derechos Humanos",
+  "official": true,
+  "enabled": true,
+  "use_nvidia": false,
+  "max_results": 0,
+  "results_path": "data",
+  "total_pages_path": "meta.pagination.pageCount",
+  "page_param": "pagination[page]",
+  "page_size_param": "pagination[pageSize]",
+  "page_start": 1,
+  "page_size": 100,
+  "request_params": {"populate": "*", "sort": "fecha_y_hora_de_inicio:desc"},
+  "field_map": {
+    "title": "attributes.titulo",
+    "start_date": "attributes.fecha_y_hora_de_inicio",
+    "end_date": "attributes.fecha_y_hora_de_termino",
+    "venue": "attributes.lugar",
+    "price": "attributes.precio",
+    "category": "attributes.tipo_de_evento.data.attributes.tipo_de_evento",
+    "description": {"path": "attributes.contenido.*.campo", "join": "\n"},
+    "source_url": "attributes.slug",
+    "image_url": "attributes.poster.data.attributes.url"
+  },
+  "field_url_bases": {
+    "source_url": "https://mmdh.cl/cartelera/",
+    "image_url": "https://manager.mmdh.cl/"
+  },
+  "location_defaults": {
+    "venue": "Museo de la Memoria y los Derechos Humanos",
+    "commune": "Santiago",
+    "region": "Región Metropolitana de Santiago"
+  },
+  "integration_status": "active",
+  "integration_verified_at": "2026-10-28",
+  "integration_note": "Reemplaza Teatro del Lago. Usa la API Strapi pública consumida por la propia cartelera, sin claves. Conserva las fechas ISO UTC y todas las páginas; los eventos vencidos se filtran localmente. Validación local HTTP, pendiente comprobar acceso desde GitHub Actions."
+}

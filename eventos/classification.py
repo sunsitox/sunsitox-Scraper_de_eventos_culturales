@@ -16,6 +16,7 @@ from .models import Event
 from .text import clean_list, normalized, text_from_html
 
 CLASSIFICATION_VERSION = "2026-10-27.1"
+RULES_REVISION = "2026-10-28.1"
 CANONICAL_CATEGORIES = (
     "Música", "Teatro", "Danza", "Cine y audiovisual", "Artes visuales",
     "Literatura", "Patrimonio", "Artesanía", "Gastronomía", "Cultura del vino",
@@ -45,12 +46,12 @@ ALIASES = {
 }
 
 CONTENT_TERMS = {
-    "Música": ("concierto", "conciertos", "musica", "musical", "jazz", "recital", "opera", "orquesta", "cantautor", "sinfonico", "dj set"),
+    "Música": ("concierto", "conciertos", "musica", "musical", "jazz", "recital", "opera", "orquesta", "cantautor", "sinfonico", "dj set", "canto", "melodias"),
     "Teatro": ("obra de teatro", "obra teatral", "montaje teatral", "dramaturgia", "teatro experimental", "titeres"),
     "Danza": ("danza", "ballet", "milonga", "tango", "baile", "coreografia", "cueca"),
     "Cine y audiovisual": ("cine", "cinematografico", "documental", "cortometraje", "largometraje", "cineforo"),
-    "Artes visuales": ("artes visuales", "fotografia", "pintura", "escultura", "grabado", "acuarela", "ilustracion"),
-    "Literatura": ("literatura", "poesia", "lectura", "cuentacuentos", "presentacion del libro", "feria del libro", "feria de libros", "escritura creativa"),
+    "Artes visuales": ("artes visuales", "fotografia", "fotografias", "pintura", "escultura", "grabado", "acuarela", "ilustracion", "collage", "autorretrato"),
+    "Literatura": ("literatura", "poesia", "lectura", "cuentacuentos", "presentacion del libro", "lanzamiento del libro", "feria del libro", "feria de libros", "escritura creativa"),
     "Patrimonio": ("patrimonio", "patrimonial", "memoria historica", "historia local"),
     "Artesanía": ("artesania", "artesanal", "oficios tradicionales", "ceramica", "telar"),
     "Gastronomía": ("gastronomia", "gastronomica", "cocina tradicional", "cocina chilena", "cultura del cafe"),
@@ -59,7 +60,7 @@ CONTENT_TERMS = {
     "Humor": ("stand up", "standup", "stand-up", "comedia", "humor", "comediante"),
     "Culturas populares": ("fonda", "fondas", "ramada", "carnaval", "folclor", "folklore", "cosplay", "anime", "tradiciones populares"),
     "Diseño": ("diseno de autor", "diseno textil", "diseno grafico"),
-    "Artes mediales": ("arte digital", "artes mediales", "videoarte", "arte sonoro"),
+    "Artes mediales": ("arte digital", "artes mediales", "videoarte", "arte sonoro", "instalacion sonora"),
     "Divulgación y pensamiento": ("divulgacion cientifica", "filosofia", "pensamiento critico", "astronomia", "humanidades"),
 }
 
@@ -95,7 +96,7 @@ def evidence_text(event: Event) -> str:
 
 
 def input_signature(event: Event) -> str:
-    value = [CLASSIFICATION_VERSION, event.title, original_categories(event), event.source_description or event.description, event.ocr_text]
+    value = [CLASSIFICATION_VERSION, RULES_REVISION, event.title, original_categories(event), event.source_description or event.description, event.ocr_text]
     return hashlib.sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest()
 
 
@@ -150,7 +151,7 @@ def classify_event(event: Event) -> dict:
     known |= {alias for aliases in ALIASES.values() for alias in aliases}
     known |= {alias for aliases in AUDIENCE_ALIASES.values() for alias in aliases}
     metadata = {
-        "version": CLASSIFICATION_VERSION, "raw_categories": raw,
+        "version": CLASSIFICATION_VERSION, "rules_revision": RULES_REVISION, "raw_categories": raw,
         "content_kind": content_kind(event, raw), "categories": categories,
         "formats": formats, "audiences": audiences, "programs": programs,
         "unmapped_labels": [label for label in raw if normalized(label) not in known],

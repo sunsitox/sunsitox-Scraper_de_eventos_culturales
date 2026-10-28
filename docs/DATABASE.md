@@ -8,7 +8,7 @@
 | Título de portada | Base de datos de eventos culturales |
 | Proyecto | MVP · Agregador de eventos culturales de Chile |
 | Subtítulo | Diccionario de tablas, columnas, relaciones y categorías |
-| Versión documentada | 27 de octubre de 2026 |
+| Versión documentada | 28 de octubre de 2026 |
 | Esquema | `public` de Supabase/PostgreSQL |
 | Uso | Documento de uso personal |
 | Encabezado | EVENTO CULTURAL · DOCUMENTACIÓN 2026 |
@@ -29,6 +29,7 @@
 - `supabase/migrations/20261020000300_integrate_expired_cleanup.sql`
 - `supabase/migrations/20261024000100_password_reset_tokens.sql`
 - `supabase/migrations/20261027000100_cultural_classification.sql`
+- `supabase/migrations/20261028000100_publish_existing_reviews.sql`
 
 ### Alcance y fuente de verdad
 
@@ -77,15 +78,15 @@ corrección independiente. Instalar la tabla no despliega ni valida el envío de
 
 ### Clasificación cultural del 27 de octubre de 2026
 
-La migración `20261027000100_cultural_classification.sql` está preparada y probada localmente;
-su presencia en el repositorio no acredita que esté aplicada en Supabase. Añade el objeto JSON
+La migración `20261027000100_cultural_classification.sql` se verificó aplicada en Supabase el
+28 de octubre mediante el historial remoto y la consulta del campo. Añade el objeto JSON
 `event_provenance.classification` y conserva ese objeto durante la publicación atómica. Incluye
 la RPC privada `apply_catalog_classifications(jsonb,text)`, ejecutable solo por `service_role`.
 Instalarla no reclasifica ni borra eventos. No cambia las políticas de usuarios ni de autenticación.
 
 La taxonomía versionada distingue disciplinas, formatos, públicos y programas; conserva las
 etiquetas originales y la evidencia. Los directorios de librerías/museos no se consideran eventos.
-Los casos ambiguos quedan como `draft` y los rechazados se pueden archivar sin borrar filas ni
+Con la política restrictiva `quarantine`, los casos ambiguos quedan como `draft`; los rechazados se pueden archivar sin borrar filas ni
 interacciones. La RPC de mantenimiento protege publicaciones manuales, supresiones, organizadores
 bloqueados, fuentes inactivas y eventos ya cancelados/archivados. No modifica fechas ni textos.
 
@@ -93,6 +94,33 @@ El comando `python -m tools.reclassify_catalog` produce una simulación local si
 `--apply` habilita la escritura después de verificar la migración. Antes de aplicarlo se debe
 revisar la propuesta, ya que puede reducir considerablemente el catálogo visible. Las categorías
 sin asociaciones no se borran automáticamente, para no afectar referencias del backend.
+
+### Visibilidad de revisiones del 28 de octubre de 2026
+
+La configuración activa del scraper usa `cultural_review_action=keep`. Un candidato vigente puede
+estar publicado y seguir clasificado como `review`: visibilidad y clasificación son dimensiones
+distintas. `classification.review_action` registra la política aplicada y
+`classification.publication_status` el destino automático; `events.is_suppressed` conserva la
+ocultación administrativa persistente y no es sobrescrita por el scraper. El panel debe gestionar
+esa marca mediante un backend autorizado para `admin`; estos cambios no implementan el panel.
+
+La migración `20261028000100_publish_existing_reviews.sql` aplica una actualización de datos
+acotada y atómica, sin tablas, columnas, índices ni permisos nuevos. Publica únicamente borradores
+extraídos cuya procedencia acredita `decision=review`, `content_kind=event` y destino previo
+`draft`, de la versión conocida del clasificador. Comprueba vigencia con el reloj de PostgreSQL
+y el inicio del día en Santiago. Excluye fechas inconsistentes, eventos sin inicio, borradores
+manuales, supresiones, organizadores bloqueados y fuentes inactivas o retiradas. No restaura
+archivados/cancelados ni cambia categorías, textos, OCR o interacciones. Su repetición no vuelve
+a modificar las filas ya publicadas.
+
+Se aplicó y verificó en Supabase el 28 de octubre: 369 revisiones pasaron de borrador a publicadas,
+manteniendo su decisión y evidencia. El conteo observado pasó de 577 publicados/371 borradores a
+946 publicados/2 borradores; los 289 archivados y el total de 1.237 registros se conservaron.
+Son cifras de esa comprobación, no cantidades fijas del catálogo.
+
+La RPC y la herramienta `tools.reclassify_catalog` mantienen el modo conservador `quarantine`;
+no deben ejecutarse con `--apply` para publicar pendientes. Las siguientes sincronizaciones
+normales aplican `keep`, respetando las supresiones administrativas y los demás controles.
 
 ## 1. Vista general
 
@@ -345,7 +373,7 @@ por región y deduplicar todas las fuentes.
 | `location` | `text` | Obligatorio | Etiqueta canónica para mostrar y buscar, construida desde recinto, dirección y territorio. Nunca queda vacía. |
 | `location_precision` | `text` | Obligatorio | Nivel disponible: `exact`, `coordinates`, `venue`, `commune`, `city`, `region`, `online` o `country`. |
 | `location_source` | `text` | Obligatorio | Procedencia: `source-data`, `source-default`, `deterministic-inference`, `nvidia-nim` o `geographic-fallback`. |
-| `status` | `text` | Obligatorio, `published` por defecto | Estado editorial: `published`, `cancelled`, `draft` o `archived`. El scraper actual carga como `published`. |
+| `status` | `text` | Obligatorio, `published` por defecto | Estado editorial: `published`, `cancelled`, `draft` o `archived`. Con `keep`, los candidatos aceptados y en revisión pueden publicarse; no sustituye la clasificación ni la supresión administrativa. |
 | `is_suppressed` | `boolean` | `false` por defecto | Exclusión administrativa persistente; el scraper no la sobrescribe. |
 | `suppression_reason` | `text` | Opcional | Motivo de la exclusión individual. |
 | `suppressed_at` | `timestamptz` | Opcional | Momento en que se ocultó el evento. |
@@ -537,7 +565,8 @@ fuentes y se complementaban con reglas locales, mezclando disciplinas con otros 
 Con la nueva clasificación, `categories` contiene únicamente las 18 disciplinas canónicas de
 `eventos/classification.py`; formatos, públicos, programas y etiquetas originales se conservan
 en el objeto privado `classification`. No se asigna «Otros» por falta de evidencia: esos casos
-quedan en revisión como borradores. Las tablas siguientes no son la taxonomía nueva.
+quedan clasificados como `review`, visibles con `keep` o como borradores con `quarantine`.
+Las tablas siguientes no son la taxonomía nueva.
 
 Esta sección conserva una **fotografía histórica** del archivo
 local del 1 de septiembre de 2026: **399 eventos y 61 etiquetas**; no representa el catálogo

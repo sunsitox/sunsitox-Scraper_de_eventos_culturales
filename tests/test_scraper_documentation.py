@@ -22,7 +22,7 @@ class ScraperDocumentationTests(unittest.TestCase):
     def test_new_sources_are_documented_without_inventing_inventory_scores(self):
         reference = (ROOT / "docs/SOURCES.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        additions = [s for s in SourceRepository().load() if s.get("integration_verified_at") == "2026-10-27"]
+        additions = [s for s in SourceRepository().load() if s.get("integration_verified_at") in {"2026-10-27", "2026-10-28"}]
         self.assertEqual(len(additions), 5)
         for source in additions:
             self.assertIn(source.name, reference)

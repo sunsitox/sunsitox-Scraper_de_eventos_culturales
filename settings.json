@@ -19,8 +19,10 @@
   ],
   "include_unknown_region": false,
   "cultural_filter_enabled": true,
-  "cultural_review_action": "quarantine",
+  "cultural_review_action": "keep",
   "retired_source_names": [
-    "Rancagua Cultura"
+    "Rancagua Cultura",
+    "Teatro del Lago",
+    "Teatro Oriente"
   ]
 }

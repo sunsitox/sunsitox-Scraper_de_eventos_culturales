@@ -33,6 +33,8 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
 | [FondasChile](https://www.fondaschile.cl/) | Fondas y ramadas de Fiestas Patrias en Chile | Tarjetas HTML declarativas; solo se ejecuta en septiembre |
 | [Santiago Cultura](https://www.santiagocultura.cl/agenda-cultural/) | Agenda cultural municipal de Santiago | Índice WordPress completo y detalles incrementales por modified_gmt, con revalidación a los siete días |
 | [Ticketplus · Chile](https://ticketplus.cl/states/region-metropolitana) | Carteleras de las 16 regiones | Selector regional público, fichas estructuradas y filtro cultural global |
+| [Passline · Chile](https://home.passline.com/home) | Catálogo nacional de espectáculos | Búsqueda JSON pública paginada; país Chile explícito |
+| [PuntoTicket · Chile](https://www.puntoticket.com/) | Catálogo nacional de espectáculos | Índice JSON público y detalles JSON-LD incrementales |
 | [Corporación Cultural de Iquique](https://culturaiquique.cl/) | Programación cultural de Tarapacá | Tarjetas institucionales con fechas, categorías y fichas oficiales |
 | [Centro de Arte Molino Machmar](https://www.molinomachmar.cl/cartelera/) | Artes visuales, música, literatura y artes escénicas en Puerto Varas | Tarjetas institucionales con fechas abreviadas y fichas oficiales |
 | [Museo de la Memoria y los Derechos Humanos](https://mmdh.cl/cartelera) | Actividades culturales, memoria, cine y literatura en Santiago | API pública Strapi paginada; fechas ISO y texto original |
@@ -57,7 +59,53 @@ condiciones de acceso siempre deben confirmarse en esa publicación.
 - La configuración ejecutable de cada fuente reside en `sources/`; `_template.json` es solo una
   plantilla y no se ejecuta.
 
-La configuración vigente contiene **26 fuentes permanentes y 1 fuente estacional de septiembre** (27 configuraciones). Todas están habilitadas; la fuente de FondasChile se ejecuta únicamente durante septiembre. Una configuración sin eventos vigentes no aparece en el conteo visible de la aplicación.
+La configuración vigente contiene **28 fuentes permanentes y 1 fuente estacional de septiembre** (29 configuraciones). Todas están habilitadas; la fuente de FondasChile se ejecuta únicamente durante septiembre. Una configuración sin eventos vigentes no aparece en el conteo visible de la aplicación.
+
+## Catálogos nacionales JSON incorporados el 28-10-2026
+
+- **Passline · Chile:** `https://api.passline.com/v1/event/GetBillboardByFilters`.
+  La consulta pública del propio sitio usa POST JSON de lectura con `country=chile` y
+  `limit=OFFSET,100`. Se recorren todas las páginas hasta recibir una página corta; las
+  repeticiones o fallas dejan la fuente parcial. Se utilizan las fechas completas, recinto,
+  comuna y código regional publicados, no fechas de publicación. El identificador numérico
+  de productor no se presenta como nombre de organizador. Descripciones o direcciones
+  ausentes no se inventan. La prueba local obtuvo 1.404 registros vigentes, 1.372 después
+  de normalizar ubicación y deduplicar, y 1.331 candidatos tras el filtro cultural
+  (779 aceptados y 552 en revisión). Omitió tres registros inválidos y dejó la fuente parcial,
+  sin autorizar eliminaciones por ausencia. Fueron 15 consultas JSON, sin NVIDIA.
+- **PuntoTicket · Chile:** `https://www.puntoticket.com/Landing/GetEventosBusqueda`.
+  Se consulta el índice JSON y se enriquece cada ficha con su JSON-LD y descripción propia,
+  no con el texto de navegación o relacionados. Los detalles se guardan en checkpoints y
+  se reutilizan si el registro del índice no cambió, con revalidación a las 24 horas.
+  Se conserva el intervalo de fechas del índice: el JSON-LD puede mostrar solo la última
+  función. Las entradas sin día/año explícito, abonos y agrupadores sin funciones fechadas
+  no se convierten en ocurrencias. El índice observado contenía 242 entradas: la prueba
+  obtuvo 235 fichas vigentes, 220 después de geografía/deduplicación y 214 candidatos
+  culturales (70 aceptados y 144 en revisión). Se omitieron siete entradas sin fecha
+  verificable y se completaron 237 peticiones sin NVIDIA.
+
+La segunda pasada de PuntoTicket reutilizó sus detalles y necesitó solo dos peticiones
+(índice y portada). La comparación de solo lectura con Supabase se realiza antes de publicar;
+los candidatos no equivalen a altas nuevas y no se atribuye al sitio un contenido ausente.
+La medición final obtuvo 1.545 candidatos únicos entre las dos fuentes (849 aceptados y
+696 en revisión). La consulta remota encontró 16 coincidencias y 1.529 candidatos sin
+coincidencia. Había 946 eventos publicados; sumar todos los candidatos no coincidentes
+daría una referencia máxima de 2.475, no un conteo ya sincronizado ni una garantía de
+calidad cultural de los casos en revisión. El total real puede cambiar con el tiempo,
+el enriquecimiento, la conciliación y las decisiones administrativas.
+
+Ambas fuentes pasan por los mismos filtros culturales, geográficos, de vigencia y duplicados
+que el resto. Los géneros musicales explícitos se normalizan; «Club» o «Fiestas» no se convierten
+automáticamente en Música. El deporte y las membresías de gimnasio no se admiten para inflar
+el objetivo de 1.200–2.000 eventos. Los candidatos en revisión conservan esa distinción y
+la visibilidad sigue sujeta al panel administrativo. No hay un cupo artificial de 2.000.
+
+La comprobación usa TLS verificado, identificación honesta del proyecto y un segundo de pausa
+por petición. El User-Agent se normalizó a ASCII para evitar incompatibilidad con servidores;
+no se imita un navegador ni se eluden bloqueos 403/429. La extracción no requiere claves nuevas,
+no consume IA y no cambia su límite global de 40 RPM. OCR y redacción posteriores conservan
+sus presupuestos y colas. La accesibilidad desde Actions y el incremento neto publicado deben
+confirmarse en la siguiente ejecución completa; estas cifras locales no son una garantía.
 
 ## Comprobación de las cinco incorporaciones del 27-10-2026
 

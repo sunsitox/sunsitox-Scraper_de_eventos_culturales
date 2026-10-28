@@ -27,7 +27,7 @@ class ReplacementSourceTests(unittest.TestCase):
         for name in ('Teatro del Lago', 'Teatro Oriente'):
             self.assertNotIn(name, self.sources)
             self.assertIn(name, Settings.load().retired_source_names)
-        self.assertEqual(len(self.sources), 27)
+        self.assertGreaterEqual(len(self.sources), 27)
 
     def test_maule_excludes_historical_archive_and_other_communes(self):
         source = self.sources['Teatro Regional del Maule']

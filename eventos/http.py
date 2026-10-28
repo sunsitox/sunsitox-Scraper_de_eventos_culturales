@@ -102,3 +102,28 @@ class HttpClient:
         except requests.RequestException as exc:
             logging.warning("No se pudo obtener %s: %s", url, exc)
             raise
+
+    def post_json(
+        self,
+        url: str,
+        *,
+        json_body: dict[str, Any],
+        verify: bool = True,
+        request_headers: dict[str, str] | None = None,
+    ) -> Any:
+        """Consultas JSON de lectura que el proveedor publica mediante POST.
+
+        No reutiliza la caché GET ni registra cuerpos, cookies o credenciales.
+        Conserva el contador, timeout y pausa por dominio, también ante error.
+        """
+        self.request_count += 1
+        try:
+            response = self.session.post(
+                url, json=json_body, headers=request_headers or {},
+                timeout=self.timeout, verify=verify,
+            )
+            response.raise_for_status()
+            return response.json()
+        finally:
+            if self.delay:
+                time.sleep(self.delay)

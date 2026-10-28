@@ -16,7 +16,7 @@ from .models import Event
 from .text import clean_list, normalized, text_from_html
 
 CLASSIFICATION_VERSION = "2026-10-27.1"
-RULES_REVISION = "2026-10-28.1"
+RULES_REVISION = "2026-10-28.2"
 CANONICAL_CATEGORIES = (
     "Música", "Teatro", "Danza", "Cine y audiovisual", "Artes visuales",
     "Literatura", "Patrimonio", "Artesanía", "Gastronomía", "Cultura del vino",
@@ -25,7 +25,9 @@ CANONICAL_CATEGORIES = (
 )
 
 ALIASES = {
-    "Música": ("musica", "musica popular", "musica clasica", "concierto", "conciertos", "opera"),
+    "Música": ("musica", "musica popular", "musica clasica", "concierto", "conciertos", "opera",
+               "pop", "pop latino", "pop rock", "rock", "rock latino", "hard rock", "jazz",
+               "metal", "electronica", "techno", "reggaeton", "cumbia", "baladas", "boleros", "rancheras"),
     "Teatro": ("teatro", "titeres"),
     "Danza": ("danza", "danza performance", "danza - performance"),
     "Cine y audiovisual": ("cine", "audiovisual", "documental"),

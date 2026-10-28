@@ -90,6 +90,8 @@ def assess_cultural_relevance(event: Event) -> CulturalDecision:
     title = normalized(event.title)
     primary_sport = _matches(title, PRIMARY_SPORT_TERMS)
     explicit_art = _matches(title, {"concierto", "danza", "cueca", "folclor", "teatro", "exposicion", "patrimonio"})
+    if re.search(r"\b(?:socios|membresia|mensualidad|plan)\s+(?:de\s+)?gimnasio\b", title) and not explicit_art:
+        return result("excluded", "Membresía de gimnasio, no una ocurrencia cultural.")
     if primary_sport and not explicit_art:
         return result("excluded", "La finalidad principal publicada es deportiva/bienestar; la música de acompañamiento no la convierte en una actividad artística.")
     if _matches(title, {"kung fu", "kung-fu", "karate", "taekwondo"}) and not explicit_art:
@@ -97,6 +99,9 @@ def assess_cultural_relevance(event: Event) -> CulturalDecision:
 
     if event.categories:
         return result("accepted", "Presenta contenido o una disciplina cultural explícita; no se usa el nombre de la fuente.")
+    sport_labels = {normalized(label) for label in metadata["raw_categories"]}
+    if sport_labels.intersection({"deportes", "deportivo", "futbol", "bienestar", "outdoor"}):
+        return result("excluded", "La fuente lo clasifica como deporte/bienestar sin contenido cultural verificable.")
     if industry:
         return result("excluded", "Predomina una actividad deportiva, de servicio, académica técnica o comercial sin dimensión cultural explícita.")
     if public_program:

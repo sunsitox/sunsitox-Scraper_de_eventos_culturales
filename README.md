@@ -1,6 +1,6 @@
 # MVP · agregador de eventos culturales de Chile
 
-El recolector tiene **26 fuentes permanentes y una fuente estacional de septiembre** (27 configuraciones) mediante una arquitectura modular de conectores. Una fuente solo aparece en la aplicación cuando aporta al menos un evento vigente:
+El recolector tiene **28 fuentes permanentes y una fuente estacional de septiembre** (29 configuraciones) mediante una arquitectura modular de conectores. Una fuente solo aparece en la aplicación cuando aporta al menos un evento vigente:
 
 | Fuente | Región principal | Método |
 |---|---|---|
@@ -31,6 +31,15 @@ El recolector tiene **26 fuentes permanentes y una fuente estacional de septiemb
 | FondasChile · Septiembre | Cobertura nacional | Tarjetas HTML declarativas, activas solo en septiembre |
 | Santiago Cultura | Metropolitana | WordPress/EventON; detalles incrementales por modificación |
 | Ticketplus · Chile | Las 16 regiones de Chile | Selector regional público + fichas estructuradas; sin NVIDIA |
+| Passline · Chile | Catálogo nacional | Búsqueda JSON paginada; fechas, recinto, comuna y región publicados |
+| PuntoTicket · Chile | Catálogo nacional | Índice JSON + detalles JSON-LD incrementales |
+
+Passline y PuntoTicket no necesitan NVIDIA para extraer sus catálogos. Conservan la pausa
+por dominio, los filtros de vigencia y pertinencia y la deduplicación previa a OCR/redacción.
+No se asigna la Región Metropolitana a ubicaciones desconocidas ni se completan años ausentes.
+La meta de 1.200–2.000 eventos es orientativa: el total depende de la programación vigente,
+los duplicados, las exclusiones y la visibilidad administrativa; no se rellena ni recorta
+artificialmente. Las comprobaciones y limitaciones están en `docs/SOURCES.md`.
 
 Santiago Cultura y Ticketplus quedan activas con detalles incrementales y checkpoints.
 Santiago revisa el índice completo y reutiliza detalles sin cambios; Ticketplus descubre

@@ -23,7 +23,7 @@ class ScraperDocumentationTests(unittest.TestCase):
         reference = (ROOT / "docs/SOURCES.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         additions = [s for s in SourceRepository().load() if s.get("integration_verified_at") in {"2026-10-27", "2026-10-28"}]
-        self.assertEqual(len(additions), 5)
+        self.assertEqual(len(additions), 7)
         for source in additions:
             self.assertIn(source.name, reference)
             self.assertIn(source.name, readme)

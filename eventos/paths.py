@@ -11,4 +11,6 @@ PLAYWRIGHT_DIR = ROOT / ".playwright-browsers"
 
 REQUEST_DELAY_SECONDS = 0.8
 TIMEOUT_SECONDS = 30
-USER_AGENT = "EventosCulturalesMVP/0.3 (+proyecto académico/MVP; Chile)"
+# User-Agent es una cabecera de protocolo: identificación honesta y solo ASCII.
+# No simula un navegador ni rota identidades ante bloqueos del proveedor.
+USER_AGENT = "EventosCulturalesMVP/0.3 (+proyecto academico/MVP; Chile)"

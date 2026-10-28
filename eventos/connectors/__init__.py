@@ -11,6 +11,8 @@ from . import (  # noqa: F401,E402
     html_cards,
     json_api,
     maipu,
+    passline,
+    puntoticket,
     teatro_biobio,
     ticketplus,
     tribe,

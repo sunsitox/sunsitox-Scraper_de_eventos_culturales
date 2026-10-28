@@ -177,6 +177,29 @@ el proveedor publica `Retry-After`, responde 429 o se acumulan varios timeouts c
 No hay pausas fijas entre lotes. Los pendientes se guardan para siguientes ejecuciones.
 `NVIDIA_RETRY_MAX_ELAPSED_SECONDS` limita cada operación y sus reintentos.
 
+Además del límite por solicitud, cada etapa tiene un presupuesto acumulado: OCR 20 minutos,
+redacción 20 minutos y ubicación 5 minutos. Se configuran mediante
+`NVIDIA_OCR_STAGE_BUDGET_SECONDS`, `NVIDIA_REWRITE_STAGE_BUDGET_SECONDS` y
+`NVIDIA_LOCATION_STAGE_BUDGET_SECONDS`. El tiempo restante recorta también la espera y los
+reintentos de la siguiente operación. Tras tres operaciones consecutivas sin resultado válido,
+se suspende esa etapa, no todo el pipeline; los umbrales son `NVIDIA_OCR_FAILURE_THRESHOLD`,
+`NVIDIA_REWRITE_FAILURE_THRESHOLD` y `NVIDIA_LOCATION_FAILURE_THRESHOLD`.
+Una respuesta válida reinicia el contador. No se cambia el modelo ni se alternan claves.
+
+Los checkpoints completados se conservan y las tareas no iniciadas o fallidas quedan pendientes
+para una siguiente ejecución con el estado restaurado. El pipeline continúa con los datos
+disponibles hasta la exportación y sincronización: la falta de OCR no elimina por sí sola un
+evento válido. Esto no convierte datos incompletos en datos verificados ni garantiza que Supabase
+esté disponible; un fallo real de sincronización sigue siendo un error del workflow.
+
+Las solicitudes piden explícitamente una respuesta sin streaming. Se valida por separado la
+envoltura HTTP, el contenido del modelo y los campos esperados. Se admiten cercos Markdown,
+preámbulos y un objeto dentro de una lista unitaria, pero se rechazan respuestas truncadas o
+campos de tipo incorrecto. Los diagnósticos de una envoltura inválida muestran estado HTTP,
+tipo de contenido y tamaño, sin registrar el cuerpo de la respuesta ni credenciales.
+Estos límites reservan margen dentro de los 80 minutos del paso de procesamiento de Actions;
+no son una garantía de duración total ante bloqueos de red o del servicio de base de datos.
+
 La concurrencia de fuentes no aumenta la frecuencia de NVIDIA: el inicio de sus solicitudes pasa
 por un único limitador global. `SOURCE_WORKERS=4` controla cuántos dominios pueden trabajar simultáneamente y
 `HTTP_CACHE_ENABLED=true` activa la revalidación con ETag/Last-Modified. La caché no evita consultar

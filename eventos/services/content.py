@@ -5,44 +5,14 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any
 
 import requests
 
 from ..models import Event
 from ..text import clean, normalized
 from .nvidia import NvidiaExtractor, TRUE_VALUES, post_nvidia
-
-
-def _json_object(content: str) -> dict[str, Any]:
-    text = content.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()[1:]
-        if lines and lines[-1].strip().startswith("```"):
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
-    try:
-        value = json.loads(text)
-    except json.JSONDecodeError as original_error:
-        decoder = json.JSONDecoder()
-        for index, character in enumerate(text):
-            if character != "{":
-                continue
-            try:
-                value, _ = decoder.raw_decode(text[index:])
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, dict):
-                return value
-        raise original_error
-    if not isinstance(value, dict):
-        raise ValueError("NVIDIA no devolvió un objeto JSON")
-    return value
-
-
-def _choice_content(response: requests.Response) -> str:
-    response.raise_for_status()
-    return clean(response.json()["choices"][0]["message"]["content"])
+from .ai_budget import StageBudget
+from .nvidia_response import chat_content, json_object
 
 
 def _mark_permanent_failure(exc: requests.HTTPError) -> None:
@@ -91,6 +61,7 @@ class NvidiaContentEnricher:
             1.0,
             float(os.getenv("NVIDIA_OCR_RETRY_MAX_ELAPSED_SECONDS", "100")),
         )
+        budget = StageBudget("OCR", "OCR NVIDIA", 1200)
         changed = 0
         candidates = []
         for event in events:
@@ -106,7 +77,9 @@ class NvidiaContentEnricher:
             candidates.sort(key=lambda event: self.queue.attempts("ocr", event))
         if max_images:
             candidates = candidates[:max_images]
-        for event in candidates:
+        for position, event in enumerate(candidates):
+            if not budget.can_start(len(candidates) - position):
+                break
             if self.queue and not self.queue.ready("ocr", event):
                 continue
             checkpoint = self.queue.start("ocr", event) if self.queue else None
@@ -129,21 +102,23 @@ class NvidiaContentEnricher:
                     }
                 ],
                 "temperature": 0,
+                "stream": False,
                 "max_tokens": min(4096, max(512, int(os.getenv("NVIDIA_MAX_TOKENS", "4096")))),
             }
             try:
-                result = _json_object(
-                    _choice_content(
+                result = json_object(
+                    chat_content(
                         post_nvidia(
                             payload,
                             api_key,
                             retries=retries,
                             timeout=timeout,
                             max_wait=max_wait,
-                            max_elapsed=max_elapsed,
+                            max_elapsed=budget.request_limit(max_elapsed),
                             operation="OCR NVIDIA",
                         )
-                    )
+                    ),
+                    "ocr_text",
                 )
                 ocr_text = clean(result.get("ocr_text"))
                 if not isinstance(result.get("ocr_text"), str):
@@ -153,12 +128,15 @@ class NvidiaContentEnricher:
                     changed += 1
                 if self.queue:
                     self.queue.finish("ocr", checkpoint, {"ocr_text": ocr_text})
+                budget.record(True)
             except requests.HTTPError as exc:
+                budget.record(False)
                 if self.queue:
                     self.queue.finish("ocr", checkpoint, error=str(exc))
                 _mark_permanent_failure(exc)
                 logging.warning("OCR NVIDIA falló para %s: %s", event.source_url, exc)
             except (requests.RequestException, json.JSONDecodeError, ValueError, KeyError, IndexError, TypeError) as exc:
+                budget.record(False)
                 if self.queue:
                     self.queue.finish("ocr", checkpoint, error=str(exc))
                 logging.warning("OCR NVIDIA no produjo texto utilizable para %s: %s", event.source_url, exc)
@@ -179,6 +157,7 @@ class NvidiaContentEnricher:
             1.0,
             float(os.getenv("NVIDIA_REWRITE_RETRY_MAX_ELAPSED_SECONDS", "360")),
         )
+        budget = StageBudget("REWRITE", "Redacción NVIDIA", 1200)
         candidates = []
         for event in events:
             if self.queue and not self.queue.ready("rewrite", event):
@@ -194,6 +173,8 @@ class NvidiaContentEnricher:
             range(0, len(candidates), batch_size),
             start=1,
         ):
+            if not budget.can_start(len(candidates) - start):
+                break
             batch = candidates[start : start + batch_size]
             checkpoints = [self.queue.start("rewrite", event) for event in batch] if self.queue else []
             completed = set()
@@ -232,32 +213,34 @@ class NvidiaContentEnricher:
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.2,
+                "stream": False,
                 "max_tokens": min(4096, max(512, int(os.getenv("NVIDIA_MAX_TOKENS", "4096")))),
                 "chat_template_kwargs": {"enable_thinking": False},
             }
             try:
-                result = _json_object(
-                    _choice_content(
+                result = json_object(
+                    chat_content(
                         post_nvidia(
                             payload,
                             api_key,
                             retries=retries,
                             timeout=timeout,
                             max_wait=max_wait,
-                            max_elapsed=max_elapsed,
+                            max_elapsed=budget.request_limit(max_elapsed),
                             operation="Redacción NVIDIA",
                         )
-                    )
+                    ),
+                    "events",
                 )
                 rewritten = result.get("events")
                 if not isinstance(rewritten, list):
                     raise ValueError('La redacción de NVIDIA no contiene una lista en "events"')
                 for row in rewritten:
-                    if not isinstance(row, dict) or not isinstance(row.get("index"), int):
+                    if not isinstance(row, dict) or type(row.get("index")) is not int:
                         continue
                     index = row["index"]
-                    description = clean(row.get("description"))
-                    if 0 <= index < len(batch) and description:
+                    description = clean(row.get("description")) if isinstance(row.get("description"), str) else ""
+                    if 0 <= index < len(batch) and index not in completed and description:
                         batch[index].description = description
                         batch[index].is_rewritten = True
                         changed += 1
@@ -270,6 +253,7 @@ class NvidiaContentEnricher:
             except (requests.RequestException, json.JSONDecodeError, ValueError, KeyError, IndexError, TypeError) as exc:
                 logging.warning("Redacción NVIDIA no produjo contenido utilizable: %s", exc)
             finally:
+                budget.record(bool(completed))
                 if self.queue:
                     for index, checkpoint in enumerate(checkpoints):
                         if index not in completed:

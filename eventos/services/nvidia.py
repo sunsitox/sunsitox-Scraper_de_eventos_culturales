@@ -18,6 +18,8 @@ from bs4 import BeautifulSoup
 from ..config import SourceConfig
 from ..models import Event
 from ..text import clean, clean_list, normal_date, normalized, now_iso
+from .ai_budget import StageBudget
+from .nvidia_response import chat_content
 
 
 TRUE_VALUES = {"1", "true", "yes", "si", "sí", "on"}
@@ -299,16 +301,13 @@ class NvidiaExtractor:
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0,
+            "stream": False,
             "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
         }
-        finish_reason = "desconocido"
         try:
             response = post_nvidia(payload, api_key)
-            response.raise_for_status()
-            choice = response.json()["choices"][0]
-            finish_reason = choice.get("finish_reason") or "desconocido"
-            content = choice["message"]["content"]
+            content = chat_content(response)
             records = parse_nvidia_content(content)
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else 0
@@ -324,9 +323,8 @@ class NvidiaExtractor:
             return []
         except (json.JSONDecodeError, ValueError) as exc:
             logging.warning(
-                "NVIDIA NIM devolvió JSON inválido para %s (fin=%s): %s",
+                "NVIDIA NIM devolvió una respuesta no utilizable para %s: %s",
                 page_url,
-                finish_reason,
                 exc,
             )
             return []
@@ -420,9 +418,12 @@ class NvidiaLocationEnricher:
             1.0,
             float(os.getenv("NVIDIA_LOCATION_RETRY_MAX_ELAPSED_SECONDS", "240")),
         )
+        budget = StageBudget("LOCATION", "Ubicación NVIDIA", 300)
         changed = 0
         batches = 0
         for start in range(0, len(events), batch_size):
+            if NvidiaExtractor.unavailable_reason or not budget.can_start(len(events) - start):
+                break
             if batches >= max_batches:
                 logging.warning(
                     "NVIDIA ubicación: quedan %s eventos sin revisar por NVIDIA_LOCATION_MAX_BATCHES.",
@@ -467,6 +468,7 @@ class NvidiaLocationEnricher:
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0,
+                "stream": False,
                 "max_tokens": min(4096, max(512, int(os.getenv("NVIDIA_MAX_TOKENS", "4096")))),
                 "chat_template_kwargs": {"enable_thinking": False},
             }
@@ -478,13 +480,13 @@ class NvidiaLocationEnricher:
                     retries=retries,
                     timeout=timeout,
                     max_wait=max_wait,
-                    max_elapsed=max_elapsed,
+                    max_elapsed=budget.request_limit(max_elapsed),
                     operation="Ubicación NVIDIA",
                 )
-                response.raise_for_status()
-                content = response.json()["choices"][0]["message"]["content"]
+                content = chat_content(response)
                 records = parse_nvidia_locations(content)
             except requests.HTTPError as exc:
+                budget.record(False)
                 if self.queue:
                     for checkpoint in checkpoints:
                         self.queue.finish("location", checkpoint, error=str(exc))
@@ -494,6 +496,7 @@ class NvidiaLocationEnricher:
                 logging.warning("NVIDIA no pudo normalizar un lote de ubicaciones: %s", exc)
                 continue
             except (requests.RequestException, json.JSONDecodeError, ValueError, KeyError, IndexError, TypeError) as exc:
+                budget.record(False)
                 if self.queue:
                     for checkpoint in checkpoints:
                         self.queue.finish("location", checkpoint, error=str(exc))
@@ -503,7 +506,7 @@ class NvidiaLocationEnricher:
             completed = set()
             for record in records:
                 index = record.get("index")
-                if not isinstance(index, int) or not 0 <= index < len(batch):
+                if type(index) is not int or not 0 <= index < len(batch) or index in completed:
                     continue
                 event = batch[index]
                 event_changed = False
@@ -528,6 +531,7 @@ class NvidiaLocationEnricher:
                 for index, checkpoint in enumerate(checkpoints):
                     if index not in completed:
                         self.queue.finish("location", checkpoint, error="Sin resultado para este evento")
+            budget.record(bool(completed))
         if batches:
             logging.info(
                 "NVIDIA ubicación: %s candidatos, %s lotes, %s enriquecidos.",
